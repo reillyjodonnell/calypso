@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '8000:8000' # Map the port to access your app (if needed)
+    volumes:
+      - .:/app # Mounts the project directory on the host to /app inside the container
+    environment:
+      - PATH=/usr/bin:${PATH} # Set the environment variable for ffmpeg
