@@ -4,13 +4,24 @@ import {
   Client,
   GatewayIntentBits,
   SlashCommandBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
+  ChannelType,
 } from 'discord.js';
 import { createAudioPlayer } from '@discordjs/voice';
 import { createDuel, getDuelById } from './src/duels';
+import { Database } from 'bun:sqlite';
+
+const db = new Database('players.sqlite');
+
+// persist the users with their record, player info, etc.
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
-const DUEL_CHANNEL_ID = '1199749866339971072';
+const DUEL_CHANNEL_NAME = 'duel';
+
+const duels = new Map<string, { challenger: string; challenged: string }>();
 
 // this is going to be a map of duel ids to players
 
@@ -79,16 +90,6 @@ const initiativeCommand = new SlashCommandBuilder()
       .setRequired(true)
       .addChoices({ name: 'd20', value: 'd20' })
   );
-const rollToHitCommand = new SlashCommandBuilder()
-  .setName('roll_to_hit')
-  .setDescription('Rolls to hit!')
-  .addStringOption((option) =>
-    option
-      .setName('dice')
-      .setDescription('The dice to roll')
-      .setRequired(true)
-      .addChoices({ name: 'd20', value: 'd20' })
-  );
 
 const rollForDamageCommand = new SlashCommandBuilder()
   .setName('roll_for_damage')
@@ -98,7 +99,7 @@ const rollForDamageCommand = new SlashCommandBuilder()
       .setName('dice')
       .setDescription('The dice to roll')
       .setRequired(true)
-      .addChoices({ name: 'd20', value: 'd20' })
+      .addChoices({ name: 'd6', value: 'd6' })
   );
 
 const attackCommand = new SlashCommandBuilder()
@@ -109,6 +110,13 @@ const attackCommand = new SlashCommandBuilder()
       .setName('user')
       .setDescription('The user to attack')
       .setRequired(true)
+  )
+  .addStringOption((option) =>
+    option
+      .setName('dice')
+      .setDescription('Roll to hit!')
+      .setRequired(true)
+      .addChoices({ name: 'd20', value: 'd20' })
   );
 
 const healCommand = new SlashCommandBuilder()
@@ -116,7 +124,18 @@ const healCommand = new SlashCommandBuilder()
   .setDescription('Heal another player')
   .addUserOption((option) =>
     option.setName('user').setDescription('The user to heal').setRequired(true)
+  )
+  .addStringOption((option) =>
+    option
+      .setName('dice')
+      .setDescription('The dice to roll')
+      .setRequired(true)
+      .addChoices({ name: 'd4', value: 'd4' })
   );
+
+const statsCommand = new SlashCommandBuilder()
+  .setName('stats')
+  .setDescription('View your stats');
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
@@ -132,11 +151,11 @@ try {
       resumeCommand,
       duelCommand,
       acceptCommand,
-      rollToHitCommand,
       rollForDamageCommand,
       healCommand,
       attackCommand,
       initiativeCommand,
+      statsCommand,
     ],
   });
 
@@ -146,8 +165,6 @@ try {
 }
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
-const player = createAudioPlayer();
 
 client.on('ready', () => {
   console.log(`Logged in as ${client.user?.tag}!`);
@@ -162,6 +179,13 @@ client.on('interactionCreate', async (interaction) => {
       console.log('ping received. Sending pong');
       await interaction.reply('Pong!');
       break;
+    case 'stats': {
+      // retrieve that players stats from the db
+      const userId = interaction.user?.id;
+      if (!userId) return;
+      interaction.reply('Stats coming soon!');
+      break;
+    }
     case 'roll': {
       const dice = interaction.options.getString('dice');
       // make sure dice is this type: Dice
@@ -173,14 +197,34 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     case 'duel': {
+      const guild = interaction.guild;
+      if (!guild) {
+        await interaction.reply('This command can only be used in a server.');
+        return;
+      }
+      let duelChannel = interaction.guild?.channels.cache.find(
+        (channel) => channel.name === DUEL_CHANNEL_NAME && channel.isTextBased()
+      );
+
+      // Check if the channel already exists
+
+      if (!duelChannel) {
+        // Create new channel if it doesn't exist
+        duelChannel = await guild.channels.create({
+          name: DUEL_CHANNEL_NAME,
+          type: ChannelType.GuildText, // Ensure it's a text channel
+          reason: 'Needed a channel for duels',
+        });
+      }
+
       console.log('dueling...');
       const user = interaction.options.getUser('user', true);
       // create duel and add user
       const challengerId = interaction.user.id;
       // add user to duel
-      createDuel(DUEL_CHANNEL_ID);
+      createDuel(duelChannel.id);
 
-      const manager = getDuelById(DUEL_CHANNEL_ID);
+      const manager = getDuelById(duelChannel.id);
       if (!manager) {
         await interaction.reply('Duel channel not found');
         break;
@@ -189,50 +233,75 @@ client.on('interactionCreate', async (interaction) => {
       manager.addPlayer(user.id);
       await interaction.reply(`Dueling ${user.username}!`);
 
-      // prompt the other user in the duel channel to accept
-      const duelChannel = client.channels.cache.get(DUEL_CHANNEL_ID);
-      if (!duelChannel) {
-        await interaction.reply(
-          'Duel channel not found or is not a text channel.'
-        );
-        break;
-      }
+      duels.set(duelChannel.id, {
+        challenger: challengerId,
+        challenged: user.id,
+      });
+
       if (duelChannel.isTextBased()) {
         // Send message in duel channel
-        duelChannel.send(
-          `<@${user.id}> <@${challengerId}> has challenged you to a duel! Use /accept to accept the challenge.`
-        );
+        duelChannel.send({
+          content: `<@${user.id}> <@${challengerId}> has challenged you to a duel! Use /accept to accept the challenge.`,
+        });
       }
       break;
     }
 
     case 'accept': {
-      const duelChannel = client.channels.cache.get(DUEL_CHANNEL_ID);
-      const manager = getDuelById(DUEL_CHANNEL_ID);
+      console.log("looking for channel named 'duel-channel'...");
+      const duelChannel = interaction.guild?.channels.cache.find(
+        (channel) => channel.name === DUEL_CHANNEL_NAME && channel.isTextBased()
+      );
+      if (!duelChannel) return;
+      console.log('duel channel found!');
+      const manager = getDuelById(duelChannel.id);
       if (!manager) {
         await interaction.reply('Duel channel not found');
         break;
       }
 
+      // check if it's the cahllenged user
+      const isChallengedUser =
+        duels.get(duelChannel.id)?.challenged === interaction.user.id;
+
+      if (!isChallengedUser) {
+        await interaction.reply('You are not the challenged user, dick.');
+        break;
+      }
+
       const players = manager.getPlayers();
-      const challengerId = players?.filter(
-        (player) => player.getId() !== interaction.user.id
-      )[0];
+      const challengerId = players
+        ?.filter((player) => player.getId() !== interaction.user.id)[0]
+        .getId();
+
+      // make sure the person who accepted is the challenged
+
+      console.log('challengerId: ', challengerId);
+
+      if (!challengerId) {
+        await interaction.reply('Challenger not found');
+        break;
+      }
       if (!duelChannel) {
         await interaction.reply(
           'Duel channel not found or is not a text channel.'
         );
         break;
       }
+      interaction.reply(`Duel accepted!`);
       if (duelChannel.isTextBased()) {
         // Send message in duel channel
         duelChannel.send(
-          `<@${challengerId}> <@${interaction.user.id}> roll for initiative using /roll d20`
+          `<@${challengerId}> <@${interaction.user.id}> roll for initiative using /initiative d20`
         );
       }
       break;
     }
     case 'initiative': {
+      const duelChannel = interaction.guild?.channels.cache.find(
+        (channel) => channel.name === DUEL_CHANNEL_NAME && channel.isTextBased()
+      );
+      if (!duelChannel) return;
       const dice = interaction.options.getString('dice');
       // make sure dice is this type: Dice
       if (!dice) return;
@@ -240,7 +309,7 @@ client.on('interactionCreate', async (interaction) => {
       const result = roll(sides as Dice).toString();
 
       // find which player this is
-      const manager = getDuelById(DUEL_CHANNEL_ID);
+      const manager = getDuelById(duelChannel.id);
       if (!manager) {
         await interaction.reply('Duel channel not found');
         break;
@@ -257,8 +326,8 @@ client.on('interactionCreate', async (interaction) => {
       const allPlayersRolled = manager.haveAllPlayersRolledForinitiative();
 
       if (allPlayersRolled) {
+        manager.setTurnOrder();
         // prompt the specific user to roll for initiative
-        const duelChannel = client.channels.cache.get(DUEL_CHANNEL_ID);
         const playerWithHighestInitiative =
           manager.getPlayerWithHighestInitiative();
         // it's that players turn
@@ -277,31 +346,39 @@ client.on('interactionCreate', async (interaction) => {
         }
       }
 
+      await interaction.reply(
+        `${interaction.user.displayName} rolled a ${result} for initiative! ${
+          allPlayersRolled
+            ? ''
+            : `Waiting for other players to roll for initiative.`
+        }`
+      );
+
       break;
     }
 
     case 'attack': {
+      const duelChannel = interaction.guild?.channels.cache.find(
+        (channel) => channel.name === DUEL_CHANNEL_NAME && channel.isTextBased()
+      );
+
+      if (!duelChannel) return;
+      const manager = getDuelById(duelChannel.id);
+      if (!manager) {
+        await interaction.reply('Duel channel not found');
+        return;
+      }
       // is it this players turn?
       const isPlayersTurn =
-        getDuelById(DUEL_CHANNEL_ID)?.getCurrentPlayer()?.getId() ===
-        interaction.user.id;
-      if (!isPlayersTurn) {
-        await interaction.reply('It is not your turn, dick!');
-        break;
-      }
+        manager.getCurrentPlayer()?.getId() === interaction.user.id;
+      if (!isPlayersTurn) return;
 
-      const duelChannel = client.channels.cache.get(DUEL_CHANNEL_ID);
       const otherPlayerId = interaction.options.getUser('user', true)?.id;
       if (!otherPlayerId) {
         await interaction.reply('You need to specify a user to attack!');
-        break;
+        return;
       }
       // this user needs to roll to hit
-      const manager = getDuelById(DUEL_CHANNEL_ID);
-      if (!manager) {
-        await interaction.reply('Duel channel not found');
-        break;
-      }
 
       const player = manager.getPlayer(interaction.user.id);
 
@@ -314,31 +391,15 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.reply(
           'Duel channel not found or is not a text channel.'
         );
-        break;
+        return;
       }
-      if (duelChannel.isTextBased()) {
-        // Send message in duel channel
-        duelChannel.send(
-          `<@${player.getId()}> roll to hit using /rollToHit d20`
-        );
-      }
-      break;
-    }
-    case 'roll_to_hit': {
-      const manager = getDuelById(DUEL_CHANNEL_ID);
-      if (!manager) {
-        await interaction.reply('Duel channel not found');
-        break;
-      }
-      if (channelId === DUEL_CHANNEL_ID) {
+
+      if (channelId === duelChannel.id) {
         // check if it's that players turn
         const player = manager.getPlayer(interaction.user.id);
         if (!player) throw new Error('player not found!');
         const isPlayersTurn = player?.isPlayersTurn();
-        if (!isPlayersTurn) {
-          await interaction.reply('It is not your turn, dick!');
-          break;
-        }
+        if (!isPlayersTurn) return;
 
         const dice = interaction.options.getString('dice');
         // make sure dice is this type: Dice
@@ -359,73 +420,96 @@ client.on('interactionCreate', async (interaction) => {
         if (doesItHit) {
           // the player hit and needs to roll for damage
           await interaction.reply(
-            `You rolled a ${result} and hit! Roll for damage using /damage d6`
+            `You rolled a ${result} and hit! Roll for damage using /roll_for_damage d6`
           );
+          return;
         } else {
-          // the player missed and their turn is over
           manager.nextPlayersTurn();
+          // the player missed and their turn is over
+
           await interaction.reply(
-            `You rolled a ${result} and missed :(.\n\n${`<@${manager
+            `You rolled a ${result} and missed :(.\n\n<@${manager
               .getCurrentPlayer()
-              ?.getId()}> roll to hit using /rollToHit d20`}`
+              ?.getId()}> it's your turn!`
           );
+          return;
         }
-        break;
       }
     }
 
     case 'roll_for_damage': {
-      const manager = getDuelById(DUEL_CHANNEL_ID);
+      console.log('roll_for_damage');
+      const duelChannel = interaction.guild?.channels.cache.find(
+        (channel) => channel.name === DUEL_CHANNEL_NAME && channel.isTextBased()
+      );
+
+      if (!duelChannel) return;
+      console.log('we have the duel channel');
+      const manager = getDuelById(duelChannel.id);
       if (!manager) {
+        console.log('no manager');
         await interaction.reply('Duel channel not found');
         break;
       }
-      if (channelId !== DUEL_CHANNEL_ID) return;
-      // check if it's that players turn
       const player = manager.getPlayer(interaction.user.id);
       if (!player) throw new Error('player not found!');
-      const isPlayersTurn =
-        manager.getCurrentPlayer()?.getId() === player.getId();
-
+      const isPlayersTurn = player?.isPlayersTurn();
       if (!isPlayersTurn) return;
+
+      console.log('is players turn');
+      if (channelId !== duelChannel.id) return;
+      // check if it's that players turn
 
       const dice = interaction.options.getString('dice');
       // make sure dice is this type: Dice
       if (!dice) return;
+      console.log('dice: ', dice);
       const sides = parseInt(dice.slice(1));
       const result = roll(sides as Dice).toString();
+      console.log('attack is: ', result);
 
       const otherPlayer = manager.getPlayer(player.getTargettingId());
 
       if (!otherPlayer) return;
 
-      const damage = manager.attackPlayer(otherPlayer, parseInt(result));
+      manager.attackPlayer(otherPlayer, parseInt(result));
 
       // check if other player is dead
       const isPlayerDead = manager.isPlayerDead(otherPlayer);
-
-      manager.nextPlayersTurn();
+      console.log('Is player dead: ', isPlayerDead);
 
       if (isPlayerDead) {
         // the player is dead
         await interaction.reply(
-          `You rolled a ${result} and dealt ${damage} damage! <@${otherPlayer.getId()}> is dead!`
+          `You rolled a ${result} and dealt ${result} damage! <@${otherPlayer.getId()}> is dead! <@${manager
+            .getCurrentPlayer()
+            ?.getId()}> wins!`
         );
+        return;
       } else {
+        manager.nextPlayersTurn();
         // the player is alive
-        await interaction.reply(
-          `You rolled a ${result} and dealt ${damage} damage! <@${otherPlayer.getId()}> has ${otherPlayer.getHealth()} health left.`
+        interaction.reply(
+          `You rolled a ${result} and dealt ${result} damage! <@${otherPlayer.getId()}> has ${otherPlayer.getHealth()} health left.\n\n<@${manager
+            .getCurrentPlayer()
+            ?.getId()}> it's your turn!`
         );
+        return;
       }
     }
 
     case 'heal': {
-      const manager = getDuelById(DUEL_CHANNEL_ID);
+      const duelChannel = interaction.guild?.channels.cache.find(
+        (channel) => channel.name === DUEL_CHANNEL_NAME && channel.isTextBased()
+      );
+      if (!duelChannel) return;
+      const manager = getDuelById(duelChannel.id);
       if (!manager) {
         await interaction.reply('Duel channel not found');
         break;
       }
-      if (channelId !== DUEL_CHANNEL_ID) return;
+      console.log("looking for channel named 'duel-channel'...");
+      if (channelId !== duelChannel.id) return;
 
       // check if it's that players turn
       const player = manager.getPlayer(interaction.user.id);
@@ -434,26 +518,37 @@ client.on('interactionCreate', async (interaction) => {
       const isPlayersTurn =
         manager.getCurrentPlayer()?.getId() === player.getId();
 
-      if (!isPlayersTurn) return;
+      if (!isPlayersTurn) {
+        console.log("It's not this players turn");
+        const currentPlayerId = manager.getCurrentPlayer()?.getId();
+        console.log('currentPlayerId: ', currentPlayerId);
+        return;
+      }
+      console.log("it's this players turn");
 
       const target = manager.getPlayer(interaction.user.id);
 
       if (!target) return;
+      console.log('target: ', target);
 
       const dice = interaction.options.getString('dice');
       // make sure dice is this type: Dice
-      if (!dice) return;
+      if (!dice) {
+        console.log('No dice');
+        return;
+      }
 
       const sides = parseInt(dice.slice(1));
 
       const result = roll(sides as Dice).toString();
+      console.log('result: ', result);
 
       const heal = manager.healPlayer(target, parseInt(result));
 
       manager.nextPlayersTurn();
 
       await interaction.reply(
-        `You rolled a ${result} and healed ${heal} health! <@${target.getId()}> has ${target.getHealth()} health left.\n\n${`<@${manager
+        `You rolled a ${result} and healed ${result} health! <@${target.getId()}> has ${target.getHealth()} health left.\n\n${`<@${manager
           .getCurrentPlayer()
           ?.getId()}> it's your turn! Take an action!`}`
       );

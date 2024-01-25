@@ -73,10 +73,17 @@ export class Player {
 
 export class PlayerManager {
   private players: Player[] = [];
+  private turnOrder: Player[] = [];
 
   public addPlayer(playerid: string) {
     const player = new Player(playerid);
     this.players.push(player);
+  }
+
+  public setTurnOrder() {
+    this.turnOrder = [...this.players].sort(
+      (a, b) => b.getInitiative() - a.getInitiative()
+    );
   }
 
   public getPlayer(id: string) {
@@ -118,20 +125,19 @@ export class PlayerManager {
   }
 
   public nextPlayersTurn() {
-    // make sure targetting for both is reset
-    this.players.forEach((player) => player.setTargettingId(''));
-
-    const currentPlayer = this.players.find((player) => player.isPlayersTurn());
-    if (currentPlayer) {
-      currentPlayer.endPlayersTurn();
+    if (this.turnOrder.length === 0) {
+      this.setTurnOrder(); // Set the turn order if not already set
     }
 
-    const nextPlayer = this.players.find(
-      (player) => player.getInitiative() > 0 && !player.isPlayersTurn()
-    );
-    if (nextPlayer) {
-      nextPlayer.startPlayersTurn();
-    }
+    // Move the first player to the end of the array
+    const currentPlayer = this.turnOrder.shift();
+    if (!currentPlayer) return;
+    currentPlayer?.endPlayersTurn();
+    this.turnOrder.push(currentPlayer);
+
+    // Start the next player's turn
+    const nextPlayer = this.turnOrder[0];
+    nextPlayer?.startPlayersTurn();
   }
 
   public getCurrentPlayer() {
