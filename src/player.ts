@@ -98,6 +98,12 @@ export class PlayerManager {
     this.players = this.players.filter((player) => player.getId() !== id);
   }
 
+  public setPlayerInitiative(id: string, initiative: number) {
+    const player = this.getPlayer(id);
+    if (!player) throw new Error('player not found!');
+    player.setInitiative(initiative);
+  }
+
   public doesAttackHitPlayer(defender: Player, roll: number) {
     return roll >= defender.getAC();
   }

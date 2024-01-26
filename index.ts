@@ -11,9 +11,6 @@ import {
 } from 'discord.js';
 import { createAudioPlayer } from '@discordjs/voice';
 import { createDuel, getDuelById } from './src/duels';
-import { Database } from 'bun:sqlite';
-
-const db = new Database('players.sqlite');
 
 // persist the users with their record, player info, etc.
 
@@ -172,6 +169,12 @@ client.on('ready', () => {
 
 client.on('interactionCreate', async (interaction) => {
   const channelId = interaction.channelId;
+
+  // get the map
+  // Iterate over the entries
+  for (const [key, value] of duels.entries()) {
+    console.log(key, value);
+  }
   if (!interaction.isChatInputCommand()) return;
 
   switch (interaction.commandName) {
@@ -188,15 +191,13 @@ client.on('interactionCreate', async (interaction) => {
     }
     case 'roll': {
       const dice = interaction.options.getString('dice');
-      // make sure dice is this type: Dice
-      if (!dice) return;
-      const sides = parseInt(dice.slice(1));
-      const result = roll(sides as Dice).toString();
+      const result = parseDieAndRoll(dice);
       await interaction.reply(result);
       break;
     }
 
     case 'duel': {
+      // look for duel channel
       const guild = interaction.guild;
       if (!guild) {
         await interaction.reply('This command can only be used in a server.');
@@ -206,18 +207,15 @@ client.on('interactionCreate', async (interaction) => {
         (channel) => channel.name === DUEL_CHANNEL_NAME && channel.isTextBased()
       );
 
-      // Check if the channel already exists
-
+      // Create new channel if it doesn't exist
       if (!duelChannel) {
-        // Create new channel if it doesn't exist
         duelChannel = await guild.channels.create({
           name: DUEL_CHANNEL_NAME,
-          type: ChannelType.GuildText, // Ensure it's a text channel
+          type: ChannelType.GuildText,
           reason: 'Needed a channel for duels',
         });
       }
 
-      console.log('dueling...');
       const user = interaction.options.getUser('user', true);
       // create duel and add user
       const challengerId = interaction.user.id;
@@ -303,10 +301,7 @@ client.on('interactionCreate', async (interaction) => {
       );
       if (!duelChannel) return;
       const dice = interaction.options.getString('dice');
-      // make sure dice is this type: Dice
-      if (!dice) return;
-      const sides = parseInt(dice.slice(1));
-      const result = roll(sides as Dice).toString();
+      const result = parseDieAndRoll(dice);
 
       // find which player this is
       const manager = getDuelById(duelChannel.id);
@@ -314,16 +309,19 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.reply('Duel channel not found');
         break;
       }
-      const player = manager
-        .getPlayers()
-        ?.find((player) => player.getId() === interaction.user.id);
 
-      if (!player) return;
-
-      player.setInitiative(parseInt(result));
+      manager.setPlayerInitiative(interaction.user.id, parseInt(result));
 
       // check if everyone has rolled
       const allPlayersRolled = manager.haveAllPlayersRolledForinitiative();
+      console.log('allPlayersRolled: ', allPlayersRolled);
+
+      if (!allPlayersRolled) {
+        await interaction.reply(
+          `${interaction.user.displayName} rolled a ${result} for initiative! 
+              Waiting for other players to roll for initiative.`
+        );
+      }
 
       if (allPlayersRolled) {
         manager.setTurnOrder();
@@ -333,26 +331,16 @@ client.on('interactionCreate', async (interaction) => {
         // it's that players turn
         playerWithHighestInitiative.startPlayersTurn();
         if (!duelChannel) {
-          await interaction.reply(
-            'Duel channel not found or is not a text channel.'
-          );
+          console.error("Duel channel doesn't exist");
           break;
         }
         if (duelChannel.isTextBased()) {
           // Send message in duel channel
           duelChannel.send(
-            `<@${playerWithHighestInitiative.getId()}> it's your turn! Take an action!`
+            `<@${playerWithHighestInitiative.getId()}> it's your turn! Take an action! Commands are /attack or /heal`
           );
         }
       }
-
-      await interaction.reply(
-        `${interaction.user.displayName} rolled a ${result} for initiative! ${
-          allPlayersRolled
-            ? ''
-            : `Waiting for other players to roll for initiative.`
-        }`
-      );
 
       break;
     }
@@ -402,11 +390,7 @@ client.on('interactionCreate', async (interaction) => {
         if (!isPlayersTurn) return;
 
         const dice = interaction.options.getString('dice');
-        // make sure dice is this type: Dice
-        if (!dice) return;
-        const sides = parseInt(dice.slice(1));
-        const result = roll(sides as Dice).toString();
-
+        const result = parseDieAndRoll(dice);
         const otherPlayer = manager.getPlayer(interaction.user.id);
 
         if (!otherPlayer) return;
@@ -462,11 +446,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const dice = interaction.options.getString('dice');
       // make sure dice is this type: Dice
-      if (!dice) return;
-      console.log('dice: ', dice);
-      const sides = parseInt(dice.slice(1));
-      const result = roll(sides as Dice).toString();
-      console.log('attack is: ', result);
+      const result = parseDieAndRoll(dice);
 
       const otherPlayer = manager.getPlayer(player.getTargettingId());
 
@@ -533,15 +513,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const dice = interaction.options.getString('dice');
       // make sure dice is this type: Dice
-      if (!dice) {
-        console.log('No dice');
-        return;
-      }
-
-      const sides = parseInt(dice.slice(1));
-
-      const result = roll(sides as Dice).toString();
-      console.log('result: ', result);
+      const result = parseDieAndRoll(dice);
 
       const heal = manager.healPlayer(target, parseInt(result));
 
@@ -568,3 +540,11 @@ export function roll(dice: Dice) {
 }
 
 client.login(TOKEN);
+
+function parseDieAndRoll(die: string | null) {
+  if (!die) throw new Error('die is null');
+
+  const sides = parseInt(die.slice(1));
+  const result = roll(sides as Dice).toString();
+  return result;
+}
