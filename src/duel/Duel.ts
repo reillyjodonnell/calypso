@@ -9,6 +9,7 @@ type Role = typeof CHALLENGED | typeof CHALLENGER;
 export class Duel {
   private participants: Map<Player, { role: Role; isReady: boolean }> =
     new Map();
+  private turnNumber = 0;
   private currentTurn = 0;
   private turnOrder: Player[] = [];
 
@@ -93,12 +94,17 @@ export class Duel {
   }
 
   public nextTurn() {
+    this.turnNumber++;
     // only up to the number of players
     if (this.currentTurn === this.turnOrder.length - 1) {
       this.currentTurn = 0;
     } else {
       this.currentTurn++;
     }
+  }
+
+  public getTurnNumber() {
+    return this.turnNumber;
   }
 
   public getCurrentTurnPlayerId() {

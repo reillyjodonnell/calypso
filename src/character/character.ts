@@ -1,5 +1,6 @@
 const MAX_HEALTH = 14;
 export class Player {
+  private name: string;
   private health = MAX_HEALTH;
   private ac = 11;
   private numberOfHeals = 2;
