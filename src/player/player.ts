@@ -1,3 +1,4 @@
+type PlayerStatus = 'idle' | 'attacking' | 'healing' | 'dead';
 const MAX_HEALTH = 14;
 export class Player {
   private health = MAX_HEALTH;
@@ -7,8 +8,16 @@ export class Player {
   private targetId: string | null = null;
   private gold = 0;
   private characterInfo = null; // or some default value
+  private status: PlayerStatus = 'idle';
 
   constructor(private readonly id: string) {}
+
+  public setStatus(status: PlayerStatus) {
+    this.status = status;
+  }
+  public getStatus() {
+    return this.status;
+  }
 
   public getId() {
     return this.id;
@@ -152,5 +161,11 @@ export class PlayerManager {
     if (attacker) {
       attacker.clearTarget();
     }
+  }
+
+  public declareAttack(playerId: string) {
+    const player = this.getPlayer(playerId);
+    if (!player) throw new Error("Player doesn't exist");
+    player.setStatus('attacking');
   }
 }

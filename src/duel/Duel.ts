@@ -21,6 +21,11 @@ export class Duel {
     this.participants.set(player, { role, isReady: false });
   }
 
+  public hasPlayerRolledForInitiative(playerId: string) {
+    const initative = this.rolledInitatives.get(playerId);
+    return typeof initative === 'number';
+  }
+
   public setTurnOrder(order: Player[]) {
     this.turnOrder = order;
   }
