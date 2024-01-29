@@ -43,8 +43,6 @@ import {
   buyCommand,
   testCommand,
   goldCommand,
-  getGoldCommand,
-  giveGoldCommand,
 } from './src/commands';
 import {
   createAcceptButton,
@@ -111,8 +109,6 @@ try {
       buyCommand,
       testCommand,
       goldCommand,
-      getGoldCommand,
-      giveGoldCommand,
     ],
   });
 } catch (error) {
@@ -390,7 +386,7 @@ client.on('interactionCreate', async (interaction) => {
     case 'store': {
       await interaction.reply({
         embeds: [storeEmbed],
-        components: getButtonRows(),
+        components: [...(getButtonRows() as any)],
       });
       break;
     }

@@ -4,14 +4,6 @@ export const goldCommand = new SlashCommandBuilder()
   .setName('gold')
   .setDescription('View your gold');
 
-export const giveGoldCommand = new SlashCommandBuilder()
-  .setName('remove_gold')
-  .setDescription('Lose 2 gold');
-
-export const getGoldCommand = new SlashCommandBuilder()
-  .setName('get_gold')
-  .setDescription('Get 2 gold');
-
 export const storeCommand = new SlashCommandBuilder()
   .setName('store')
   .setDescription('Displays items available for purchase');

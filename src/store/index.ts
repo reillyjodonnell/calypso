@@ -1,9 +1,9 @@
-const {
+import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
-} = require('discord.js');
+} from 'discord.js';
 
 // this should come from a db
 const featuredItems = [
@@ -72,14 +72,14 @@ export const storeEmbed = new EmbedBuilder()
       name: '🌟 Featured Items (resets in 06:12:32)',
       value: 'Items bestowed with divine powers, available for a limited time.',
     },
-    featuredItems.map((item) => ({
+    ...featuredItems.map((item) => ({
       name: `${item.emoji} ${item.name}`,
       value: `${item.description}\nPrice: ${item.price}`,
       inline: true,
     })),
     { name: '\u200B', value: '\u200B' },
     { name: '🛡️ Basic Items', value: 'Essential items for any warrior.' },
-    standardItems.map((item) => ({
+    ...standardItems.map((item) => ({
       name: `${item.emoji} ${item.name}`,
       value: `${item.description}\nPrice: ${item.price}`,
       inline: true,
