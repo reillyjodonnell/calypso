@@ -13,9 +13,24 @@ export class Duel {
   private currentTurn = 0;
   private turnOrder: Player[] = [];
 
+  // need to track skipped players
+  private skippedPlayersIds: string[] = [];
+
   private rolledInitatives: Map<string, number> = new Map();
 
   constructor(private readonly id: string) {}
+
+  public getSkippedPlayersIds() {
+    return this.skippedPlayersIds;
+  }
+  public skipPlayer(id: string) {
+    this.skippedPlayersIds.push(id);
+  }
+  public removeSkippedPlayer(id: string) {
+    this.skippedPlayersIds = this.skippedPlayersIds.filter(
+      (playerId) => playerId !== id
+    );
+  }
 
   public addPlayer(player: Player, role: Role) {
     this.participants.set(player, { role, isReady: false });

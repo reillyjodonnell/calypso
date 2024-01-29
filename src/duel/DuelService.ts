@@ -11,8 +11,11 @@ export const PLAYER_NOT_FOUND = 'PLAYER_NOT_FOUND';
 export const PLAYER_NOT_CHALLENGED = 'PLAYER_NOT_CHALLENGED';
 export const ALL_PLAYERS_READY = 'ALL_PLAYERS_READY';
 export const ALL_PLAYERS_ROLLED = 'ALL_PLAYERS_ROLLED';
+export const PLAYER_ALREADY_ROLLED = 'PLAYER_ALREADY_ROLLED';
 export const PLAYER_ROLLED = 'PLAYER_ROLLED';
 export const ATTACK_HITS = 'ATTACK_HITS';
+export const CRITICAL_HIT = 'CRITICAL_HIT';
+export const CRITICAL_FAIL = 'CRITICAL_FAIL';
 export const ATTACK_MISSES = 'ATTACK_MISSES';
 export const NOT_ATTACKERS_TURN = 'NOT_ATTACKERS_TURN';
 export const NOT_PLAYERS_TURN = 'NOT_PLAYERS_TURN';
@@ -148,7 +151,8 @@ export class DuelService {
     status:
       | typeof DUEL_NOT_FOUND
       | typeof ALL_PLAYERS_ROLLED
-      | typeof PLAYER_ROLLED;
+      | typeof PLAYER_ROLLED
+      | typeof PLAYER_ALREADY_ROLLED;
     result?: number;
     playerToGoFirst?: string;
   } {
@@ -161,7 +165,7 @@ export class DuelService {
     // check if player has already rolled
     if (duel.hasPlayerRolledForInitiative(playerId)) {
       return {
-        status: PLAYER_ROLLED,
+        status: PLAYER_ALREADY_ROLLED,
       };
     }
     const result = duel.rollForInitative(playerId, sidedDie);
@@ -231,9 +235,13 @@ export class DuelService {
       | typeof PLAYER_NOT_FOUND
       | typeof NOT_ATTACKERS_TURN
       | typeof ATTACK_HITS
-      | typeof ATTACK_MISSES;
+      | typeof ATTACK_MISSES
+      | typeof CRITICAL_HIT
+      | typeof CRITICAL_FAIL;
     roll?: number;
     nextPlayer?: Player;
+    description?: string;
+    isPlayerDead?: boolean;
   } {
     const duel = this.duelRepository.getById(duelId);
     if (!duel) {
@@ -265,9 +273,17 @@ export class DuelService {
       defender,
       roll
     );
+
     if (doesHitTarget) {
       this.playerManager.setPlayerTarget(attackerId, defenderId);
       this.duelRepository.save(duel);
+
+      if (roll === 20) {
+        return {
+          status: CRITICAL_HIT,
+          roll,
+        };
+      }
 
       return {
         status: ATTACK_HITS,
@@ -277,6 +293,21 @@ export class DuelService {
     this.playerManager.clearPlayerTarget(attackerId);
     duel.nextTurn();
     this.duelRepository.save(duel);
+
+    if (roll === 1) {
+      console.log('critical fail triggered in DuelService');
+      // calculate random event
+      const { description, isPlayerDead } =
+        this.playerManager.executeRandomOutcome(attackerId);
+      this.duelRepository.save(duel);
+      return {
+        description,
+        status: CRITICAL_FAIL,
+        isPlayerDead,
+        roll,
+        nextPlayer: duel.getCurrentTurnPlayerId(),
+      };
+    }
 
     return {
       status: ATTACK_MISSES,
@@ -288,10 +319,12 @@ export class DuelService {
     duelId,
     attackerId,
     sidedDie,
+    criticalHit = false,
   }: {
     duelId: string;
     attackerId: string;
     sidedDie: string | null;
+    criticalHit: boolean;
   }): {
     status:
       | typeof DUEL_NOT_FOUND
@@ -318,6 +351,9 @@ export class DuelService {
       };
     }
     const roll = parseDieAndRoll(sidedDie);
+    const criticalHitRoll = parseDieAndRoll(sidedDie);
+    console.log('roll ', roll);
+    console.log('criticalHitRoll ', criticalHitRoll);
 
     const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
     if (attackerId !== currentTurnPlayerId.getId()) {
@@ -325,7 +361,10 @@ export class DuelService {
     }
 
     const { isTargetDead, targetHealthRemaining, targetId } =
-      this.playerManager.attackTarget(attacker, roll);
+      this.playerManager.attackTarget(
+        attacker,
+        roll + (criticalHit ? criticalHitRoll : 0)
+      );
     this.playerManager.clearPlayerTarget(attackerId);
     duel.nextTurn();
     const { winnerId } = this.determineWinner(duelId);
@@ -338,7 +377,7 @@ export class DuelService {
         targetHealthRemaining,
         targetId,
         winnerId,
-        roll,
+        roll: roll + (criticalHit ? criticalHitRoll : 0),
         nextPlayerId,
       };
     }
@@ -347,7 +386,7 @@ export class DuelService {
       status: 'TARGET_HIT',
       targetHealthRemaining,
       targetId,
-      roll,
+      roll: roll + (criticalHit ? criticalHitRoll : 0),
       nextPlayerId,
     };
   }

@@ -16,11 +16,14 @@ import {
   ALL_PLAYERS_ROLLED,
   ALREADY_ACCEPTED_DUEL,
   ATTACK_HITS,
+  CRITICAL_FAIL,
+  CRITICAL_HIT,
   DUEL_ACCEPTED,
   DUEL_NOT_FOUND,
   DUEL_STARTED,
   DuelService,
   NOT_PLAYERS_TURN,
+  PLAYER_ALREADY_ROLLED,
   PLAYER_NOT_CHALLENGED,
   PLAYER_NOT_FOUND,
   PLAYER_ROLLED,
@@ -128,8 +131,6 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (interaction.isStringSelectMenu()) {
-    console.log('selected value is: ', interaction.values);
-    console.log('custom id is: ', interaction.customId);
     const selectedIds = interaction.values;
     const firstSelectedId = selectedIds[0];
 
@@ -146,7 +147,6 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (interaction.isButton()) {
-    console.log('custom id is: ', interaction.customId);
     const { action, guildId, threadId } = parseButtonId(interaction.customId);
 
     if (!duelThread?.id) {
@@ -280,11 +280,14 @@ client.on('interactionCreate', async (interaction) => {
             sidedDie: dice,
           });
 
-        if (status === 'PLAYER_ROLLED') {
+        console.log(result);
+
+        if (status === PLAYER_ALREADY_ROLLED) {
           await interaction.reply({
             content: "You've already rolled for initiative",
             ephemeral: true,
           });
+          break;
         }
 
         if (status === DUEL_NOT_FOUND) {
@@ -316,6 +319,7 @@ client.on('interactionCreate', async (interaction) => {
             content: `${interaction.user.displayName} rolled a ${result} for initiative!\n\nAll players have rolled for initiative.\n\n <@${playerToGoFirst}> it's your turn!`,
             components: [row as any], // Send the button with the message
           });
+          break;
         }
         break;
       }
@@ -332,7 +336,19 @@ client.on('interactionCreate', async (interaction) => {
         break;
 
       case 'roll_for_damage': {
-        await handleRollForDamage(interaction, 'd6');
+        await handleRollForDamage({
+          interaction,
+          defaultDice: 'd6',
+        });
+        break;
+      }
+
+      case 'roll_for_damage_2x': {
+        await handleRollForDamage({
+          interaction,
+          defaultDice: 'd6',
+          criticalHit: true,
+        });
         break;
       }
 
@@ -655,7 +671,7 @@ client.on('interactionCreate', async (interaction) => {
       break;
     }
     case 'roll_for_damage': {
-      await handleRollForDamage(interaction);
+      await handleRollForDamage({ interaction });
       break;
     }
 
@@ -711,17 +727,58 @@ async function handleAttack(
   const dice = defaultDice
     ? defaultDice
     : interaction.options.getString('dice');
-  const { roll, status, nextPlayer } = duelService.attemptToHit({
-    duelId: duelThread.id,
-    attackerId: interaction.user.id,
-    defenderId: targetId
-      ? targetId
-      : interaction.options.getUser('user', true)?.id,
-    sidedDie: dice,
-  });
+  const { roll, status, nextPlayer, description, isPlayerDead } =
+    duelService.attemptToHit({
+      duelId: duelThread.id,
+      attackerId: interaction.user.id,
+      defenderId: targetId
+        ? targetId
+        : interaction.options.getUser('user', true)?.id,
+      sidedDie: dice,
+    });
 
   if (status === 'NOT_ATTACKERS_TURN') {
     await interaction.reply("It's not your turn!");
+    return;
+  }
+
+  if (status === CRITICAL_HIT) {
+    const rollButton = createRollButton(
+      createButtonId({
+        action: 'roll_for_damage_2x',
+        guildId: interaction.guildId,
+        threadId: interaction.channelId,
+        counter: duelService.getCounter(),
+      }),
+      false
+    );
+    const row = new ActionRowBuilder().addComponents(rollButton);
+    await interaction.reply({
+      content: `You rolled a ${roll}. Critical hit! Damage is doubled. Roll for damage using /roll_for_damage 2d6`,
+      components: [row as any],
+    });
+    return;
+  }
+
+  if (status === CRITICAL_FAIL) {
+    const row = getAllButtonOptions({
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      userId: interaction.user.id,
+      attackId: duelService.getCounter(),
+      healId: duelService.getCounter(),
+      leaveId: duelService.getCounter(),
+    });
+
+    await interaction.reply({
+      content: `${description}\n\n<@${nextPlayer?.getId()}> it's your turn! Use /attack to begin the attack`,
+      components: [row as any],
+    });
+
+    if (isPlayerDead) {
+      // end game
+      await duelThread.setLocked(true);
+    }
     return;
   }
 
@@ -757,7 +814,15 @@ async function handleAttack(
   });
 }
 
-async function handleRollForDamage(interaction: any, defaultDice?: string) {
+async function handleRollForDamage({
+  interaction,
+  defaultDice,
+  criticalHit = false,
+}: {
+  interaction: any;
+  defaultDice?: string;
+  criticalHit?: boolean;
+}) {
   const discordService = new DiscordService();
   const duelThread = await discordService.findDuelThread(
     interaction.guild,
@@ -791,6 +856,7 @@ async function handleRollForDamage(interaction: any, defaultDice?: string) {
     duelId: duelThread.id,
     attackerId: interaction.user.id,
     sidedDie: dice,
+    criticalHit,
   });
 
   if (status === 'NOT_ATTACKERS_TURN') {
@@ -984,7 +1050,7 @@ async function promptForTarget(
           })
         )
         .setPlaceholder('Select a target')
-        .addOptions(...options)
+        .addOptions(...(options as StringSelectMenuOptionBuilder[]))
     );
 
   // Send the reply
