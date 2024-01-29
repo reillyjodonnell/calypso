@@ -42,6 +42,9 @@ import {
   statsCommand,
   buyCommand,
   testCommand,
+  goldCommand,
+  getGoldCommand,
+  giveGoldCommand,
 } from './src/commands';
 import {
   createAcceptButton,
@@ -52,6 +55,12 @@ import {
   parseButtonId,
 } from './src/buttons';
 import { DuelAccept } from './src/duel/DuelAccept';
+import { getButtonRows, storeEmbed } from './src/store';
+import { createClient } from 'redis';
+import { GoldRepository } from './src/gold/GoldRepository';
+import { RedisClientType } from '@redis/client';
+import { GoldManager } from './src/gold/GoldManager';
+import { config } from './src/config';
 
 // persist the users with their record, player info, etc.
 
@@ -73,6 +82,21 @@ if (!TOKEN || !CLIENT_ID) {
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
+const redisClient = createClient({
+  url: process.env.REDIS_URL,
+}) as RedisClientType;
+redisClient.on('error', (err) => console.log('Redis Client Error', err));
+
+redisClient.on('connect', (stream) => {
+  redisClient.set('hello', 'world');
+  console.log('Redis client connected');
+});
+await redisClient.connect();
+
+//@ts-ignore
+const goldRepository = new GoldRepository(redisClient);
+const goldManager = new GoldManager(goldRepository);
+
 try {
   await rest.put(Routes.applicationCommands(CLIENT_ID), {
     body: [
@@ -86,6 +110,9 @@ try {
       statsCommand,
       buyCommand,
       testCommand,
+      goldCommand,
+      getGoldCommand,
+      giveGoldCommand,
     ],
   });
 } catch (error) {
@@ -361,61 +388,10 @@ client.on('interactionCreate', async (interaction) => {
 
   switch (interaction.commandName) {
     case 'store': {
-      const storeEmbed = new EmbedBuilder()
-        .setColor(0x0099ff) // Hex color
-        .setTitle('🏛️ Ares Armory 🏛️')
-        .setDescription(
-          'Welcome to the armory of the gods! Here are the items available for purchase:'
-        )
-        .addFields(
-          { name: '\u200B', value: '\u200B' }, // Blank field for spacing
-
-          {
-            name: '🔮 Featured Items (resets in 00:12:32)',
-            value:
-              'Items bestowed with divine powers, available for a limited time.',
-          },
-          {
-            name: 'Elixir of Ares',
-            value: 'Heals 2d4 health points. Price: 100 gold',
-            inline: true,
-          },
-          {
-            name: 'Cloak of Shadows',
-            value: 'Grants temporary invisibility. Price: 150 gold',
-            inline: true,
-          },
-          {
-            name: 'Ring of Fortitude',
-            value: 'Temporary immunity to first attack. Price: 120 gold',
-            inline: true,
-          },
-          { name: '\u200B', value: '\u200B' }, // Blank field for spacing
-          { name: '🛡️ Basic Items', value: 'Essential items for any warrior.' },
-          {
-            name: 'Sword',
-            value: 'Increases attack power. Price: 50 gold',
-            inline: true,
-          },
-          {
-            name: 'Shield',
-            value: 'Boosts defense. Price: 40 gold',
-            inline: true,
-          },
-          {
-            name: 'Armor',
-            value: 'Provides superior protection. +1 ac Price: 60 gold',
-            inline: true,
-          },
-          {
-            name: 'Regular Potion',
-            value: 'Heals 1d4 health points. Price: 20 gold',
-            inline: true,
-          }
-        )
-        .setFooter({ text: 'Use /buy [item_name] to purchase an item.' });
-
-      await interaction.reply({ embeds: [storeEmbed] });
+      await interaction.reply({
+        embeds: [storeEmbed],
+        components: getButtonRows(),
+      });
       break;
     }
     case 'buy': {
@@ -680,6 +656,15 @@ client.on('interactionCreate', async (interaction) => {
       break;
     }
 
+    case 'gold': {
+      const gold = await goldManager.getGold(interaction.user.id);
+      await interaction.reply({
+        content: `You have ${gold} gold.`,
+        ephemeral: true,
+      });
+      break;
+    }
+
     default:
       break;
   }
@@ -770,15 +755,25 @@ async function handleAttack(
       leaveId: duelService.getCounter(),
     });
 
+    if (isPlayerDead) {
+      // end game
+      await interaction.reply({
+        content: `${description}\n\n<@${nextPlayer?.getId()}> wins!`,
+        components: [row as any],
+      });
+      await duelThread.setLocked(true);
+      if (!nextPlayer) throw new Error('nextPlayer is null');
+      await goldManager.awardGold(
+        nextPlayer?.getId(),
+        config.amountOfGoldForWin
+      );
+    }
+
     await interaction.reply({
       content: `${description}\n\n<@${nextPlayer?.getId()}> it's your turn! Use /attack to begin the attack`,
       components: [row as any],
     });
 
-    if (isPlayerDead) {
-      // end game
-      await duelThread.setLocked(true);
-    }
     return;
   }
 
@@ -900,6 +895,7 @@ async function handleRollForDamage({
     );
     // lock the thread bc the game is over
     await duelThread.setLocked(true);
+    await goldManager.awardGold(winnerId, config.amountOfGoldForWin);
     return;
   }
 }

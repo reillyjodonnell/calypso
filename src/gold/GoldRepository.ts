@@ -1,13 +1,12 @@
-import { createClient, RedisClientType } from 'redis';
+import { RedisClientType } from 'redis';
 
-interface GoldRepository {
+export interface GoldRepositoryInterface {
   awardGold(playerId: string, amount: number): Promise<void>;
   spendGold(playerId: string, amount: number): Promise<boolean>;
   getGold(playerId: string): Promise<number>;
-  initializePlayer(playerId: string, initialGold?: number): Promise<void>;
 }
 
-export class RedisGoldRepository implements GoldRepository {
+export class GoldRepository implements GoldRepositoryInterface {
   private redisClient: RedisClientType;
 
   constructor(redisClient: RedisClientType) {
@@ -15,8 +14,7 @@ export class RedisGoldRepository implements GoldRepository {
   }
 
   async awardGold(playerId: string, amount: number): Promise<void> {
-    const currentGold = await this.getGold(playerId);
-    await this.redisClient.set(playerId, currentGold + amount);
+    await this.redisClient.hIncrBy('user:' + playerId, 'gold', amount);
   }
 
   async spendGold(playerId: string, amount: number): Promise<boolean> {
@@ -24,19 +22,12 @@ export class RedisGoldRepository implements GoldRepository {
     if (amount > currentGold) {
       return false;
     }
-    await this.redisClient.set(playerId, currentGold - amount);
+    await this.redisClient.hIncrBy('user:' + playerId, 'gold', -amount);
     return true;
   }
 
   async getGold(playerId: string): Promise<number> {
-    const gold = await this.redisClient.get(playerId);
-    return parseInt(gold ?? '0') || 0;
-  }
-
-  async initializePlayer(
-    playerId: string,
-    initialGold: number = 0
-  ): Promise<void> {
-    await this.redisClient.set(playerId, initialGold);
+    const gold = await this.redisClient.hGet('user:' + playerId, 'gold');
+    return parseInt(gold ?? '0', 10);
   }
 }

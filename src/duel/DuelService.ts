@@ -295,7 +295,6 @@ export class DuelService {
     this.duelRepository.save(duel);
 
     if (roll === 1) {
-      console.log('critical fail triggered in DuelService');
       // calculate random event
       const { description, isPlayerDead } =
         this.playerManager.executeRandomOutcome(attackerId);

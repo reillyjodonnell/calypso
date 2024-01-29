@@ -1,29 +1,33 @@
+import { GoldRepositoryInterface } from './GoldRepository';
+
 export class GoldManager {
-  private playerGold: Map<string, number>;
+  private goldRepository: GoldRepositoryInterface;
 
-  constructor() {
-    this.playerGold = new Map<string, number>();
+  constructor(goldRepository: GoldRepositoryInterface) {
+    this.goldRepository = goldRepository;
   }
 
-  awardGold(playerId: string, amount: number) {
-    const currentGold = this.playerGold.get(playerId) || 0;
-    this.playerGold.set(playerId, currentGold + amount);
+  async awardGold(playerId: string, amount: number): Promise<void> {
+    await this.goldRepository.awardGold(playerId, amount);
   }
 
-  spendGold(playerId: string, amount: number) {
-    const currentGold = this.playerGold.get(playerId) || 0;
+  async spendGold(playerId: string, amount: number): Promise<boolean> {
+    const currentGold = await this.getGold(playerId);
     if (amount > currentGold) {
       return false; // Not enough gold to spend
     }
-    this.playerGold.set(playerId, currentGold - amount);
+    await this.goldRepository.spendGold(playerId, amount);
     return true;
   }
 
-  getGold(playerId: string): number {
-    return this.playerGold.get(playerId) || 0;
+  async getGold(playerId: string): Promise<number> {
+    return await this.goldRepository.getGold(playerId);
   }
 
-  initializePlayer(playerId: string, initialGold: number = 0) {
-    this.playerGold.set(playerId, initialGold);
+  async initializePlayer(
+    playerId: string,
+    initialGold: number = 0
+  ): Promise<void> {
+    await this.goldRepository.awardGold(playerId, initialGold);
   }
 }
