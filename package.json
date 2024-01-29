@@ -13,11 +13,8 @@
     "@discordjs/voice": "^0.16.1",
     "discord.js": "^14.14.1",
     "ffmpeg-static": "^5.2.0",
-<<<<<<< HEAD
     "redis": "^4.6.12",
-=======
     "nanoid": "^5.0.4",
->>>>>>> e84a248a65d91a29a0b2e41d5b170eef12b5f221
     "yt-dlp-wrap": "^2.3.12",
     "ytdl-core": "^4.11.5"
   }
