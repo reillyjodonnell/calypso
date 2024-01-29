@@ -1,6 +1,6 @@
-type PlayerStatus = 'idle' | 'attacking' | 'healing' | 'dead';
 const MAX_HEALTH = 14;
 export class Player {
+  private name: string;
   private health = MAX_HEALTH;
   private ac = 11;
   private numberOfHeals = 2;
@@ -8,16 +8,8 @@ export class Player {
   private targetId: string | null = null;
   private gold = 0;
   private characterInfo = null; // or some default value
-  private status: PlayerStatus = 'idle';
 
   constructor(private readonly id: string) {}
-
-  public setStatus(status: PlayerStatus) {
-    this.status = status;
-  }
-  public getStatus() {
-    return this.status;
-  }
 
   public getId() {
     return this.id;
@@ -162,65 +154,4 @@ export class PlayerManager {
       attacker.clearTarget();
     }
   }
-
-  public declareAttack(playerId: string) {
-    const player = this.getPlayer(playerId);
-    if (!player) throw new Error("Player doesn't exist");
-    player.setStatus('attacking');
-  }
-
-  executeRandomOutcome(playerId: string): {
-    description: string;
-    isPlayerDead?: boolean;
-  } {
-    const outcomes = ['selfHarm', 'noEffect'];
-    const selectedOutcome = this.getRandomOutcome(outcomes);
-    const player = this.getPlayer(playerId);
-
-    if (!player) throw new Error("Player doesn't exist");
-
-    switch (selectedOutcome) {
-      case 'selfHarm':
-        const damageRange = [1, 2];
-
-        const damage = chooseRandomly(damageRange);
-
-        player.hurt(damage);
-        // Apply self-harm logic, like reducing player's health
-        const isPlayerDead = player.isPlayerDead();
-        return {
-          isPlayerDead,
-          description: `You swing at your target, but miss and hit yourself for ${damage} damage! ${
-            isPlayerDead
-              ? 'You have died!'
-              : `You have ${player.getHealth()} health remaining.`
-          }`,
-        };
-      case 'noEffect':
-        return {
-          description: `You swing at your target and miss terribly. Somehow you recovered!`,
-        };
-      case 'fallDown':
-        return {
-          description: `You swing at your target but the momentum of your swing causes you to fall down. You've lost a turn!`,
-        };
-
-      default:
-        throw new Error('Invalid outcome');
-    }
-  }
-
-  getRandomOutcome(outcomes: Array<string>) {
-    const randomIndex = Math.floor(Math.random() * outcomes.length);
-    return outcomes[randomIndex];
-  }
-}
-
-function chooseRandomly<T>(options: T[]): T {
-  if (options.length !== 2) {
-    throw new Error('Array must contain exactly two elements.');
-  }
-
-  const randomIndex = Math.random() < 0.5 ? 0 : 1;
-  return options[randomIndex];
 }
