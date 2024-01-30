@@ -954,7 +954,11 @@ async function handleAttack(
         wagerManager,
         duelService
       );
-      const duelWinManager = new DuelWinManager(duelService, wagerService);
+      const duelWinManager = new DuelWinManager(
+        duelService,
+        wagerService,
+        goldManager
+      );
 
       duelWinManager.handleWin(interaction.channelId);
       // end game
@@ -1098,7 +1102,11 @@ async function handleRollForDamage({
       wagerManager,
       duelService
     );
-    const duelWinManager = new DuelWinManager(duelService, wagerService);
+    const duelWinManager = new DuelWinManager(
+      duelService,
+      wagerService,
+      goldManager
+    );
 
     duelWinManager.handleWin(interaction.channelId);
     return;
