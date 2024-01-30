@@ -104,12 +104,6 @@ export class DuelService {
         status: ALREADY_ACCEPTED_DUEL,
       };
     }
-    const isPlayerInDuel = duel.isPlayerPartOfDuel(challengedId);
-    if (!isPlayerInDuel) {
-      return {
-        status: PLAYER_NOT_FOUND,
-      };
-    }
 
     const challenged = duel.getPlayerById(challengedId);
     if (!challenged)
