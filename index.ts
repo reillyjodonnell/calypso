@@ -10,6 +10,7 @@ import {
   StringSelectMenuOptionBuilder,
   Collection,
   GuildMember,
+  TextInputStyle,
 } from 'discord.js';
 import {
   ALL_PLAYERS_READY,
@@ -44,12 +45,14 @@ import {
   buyCommand,
   testCommand,
   goldCommand,
+  inventoryCommand,
 } from './src/commands';
 import {
   createAcceptButton,
   createButtonId,
   createRejectButton,
   createRollButton,
+  createWagerButton,
   getAllButtonOptions,
   parseButtonId,
 } from './src/buttons';
@@ -59,7 +62,20 @@ import { createClient } from 'redis';
 import { GoldRepository } from './src/gold/GoldRepository';
 import { RedisClientType } from '@redis/client';
 import { GoldManager } from './src/gold/GoldManager';
-import { config } from './src/config';
+import {
+  getInventoryButtonRows,
+  inventoryEmbed,
+} from './src/inventory/InventoryEmbed';
+import { ModalBuilder, TextInputBuilder } from '@discordjs/builders';
+import { createWagerId, parseWagerId } from './src/wager/wagerHelper';
+import {
+  NOT_A_VALID_NUMBER,
+  WAGER_PLACED,
+  WagerService,
+} from './src/wager/WagerService';
+import { WagerManager } from './src/wager/WagerManager';
+import { WagerRepository } from './src/wager/WagerRepository';
+import { DuelWinManager } from './src/duel/DuelWinManager';
 
 // persist the users with their record, player info, etc.
 
@@ -95,6 +111,9 @@ await redisClient.connect();
 //@ts-ignore
 const goldRepository = new GoldRepository(redisClient);
 const goldManager = new GoldManager(goldRepository);
+//@ts-ignore
+const wagerRepository = new WagerRepository(redisClient);
+const wagerManager = new WagerManager(wagerRepository);
 
 try {
   await rest.put(Routes.applicationCommands(CLIENT_ID), {
@@ -110,6 +129,7 @@ try {
       buyCommand,
       testCommand,
       goldCommand,
+      inventoryCommand,
     ],
   });
 } catch (error) {
@@ -125,10 +145,68 @@ client.on('ready', () => {
 client.on('interactionCreate', async (interaction) => {
   const discordService = new DiscordService();
   if (!interaction.channelId) throw new Error('interaction.channelId is null');
-  const duelThread = await discordService.findDuelThread(
-    interaction.guild,
-    interaction?.channelId
-  );
+
+  // WAGER STEPS
+  // click wager button
+  // it asks you "who do you bet on" (string select menu)
+  // after you select it asks how much (text input in modal - it will need to know the WHO you bet on from the previous step OR store it somewhere..)
+  // then we validate it in the service
+  // if all good - respond publicy with the wager (@player has wagered x coins on @player2)
+
+  if (interaction.type === InteractionType.ModalSubmit) {
+    // const { action, guildId, threadId } = parseButtonId(interaction.customId);
+    const { threadId, playerToBetOn, action, guildId } = parseWagerId(
+      interaction.customId
+    );
+
+    console.log(action, guildId, playerToBetOn, threadId);
+
+    if (action === 'wager_modal') {
+      const wageredAmount =
+        interaction.fields.getTextInputValue('wager_amount');
+
+      const duelThread = await discordService.findDuelThread(
+        interaction.guild,
+        interaction?.channelId
+      );
+      if (!duelThread) throw new Error('duelThread is null');
+      const res = duelsServicesMap.get(duelThread?.id);
+
+      if (!res) {
+        throw new Error('res is null');
+      }
+
+      const { duelService } = res;
+
+      // show them the select menu to choose a player
+      const wagerService = new WagerService(
+        goldManager,
+        wagerManager,
+        duelService
+      );
+
+      const { status } = await wagerService.createWager({
+        amount: wageredAmount,
+        threadId,
+        guildId,
+        userId: interaction.user.id,
+        bettingOn: playerToBetOn,
+      });
+
+      if (status === NOT_A_VALID_NUMBER) {
+        await interaction.reply({
+          content: `Bet failed. Invalid number supplied`,
+          ephemeral: true,
+        });
+      }
+
+      if (status === WAGER_PLACED) {
+        await interaction.reply({
+          content: `<@${interaction.user.id}> wagered ${wageredAmount} coins on <@${playerToBetOn}>. Good luck!`,
+        });
+      }
+    }
+  }
 
   if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
     if (interaction.commandName === 'buy') {
@@ -167,11 +245,47 @@ client.on('interactionCreate', async (interaction) => {
       case 'heal':
         await handleHeal(interaction, 'd4');
         break;
+      case 'wager':
+        const whoTheyBetOn = firstSelectedId;
+        // Create the modal
+        const modal = new ModalBuilder()
+          .setCustomId(
+            createWagerId({
+              action: 'wager_modal',
+              guildId: interaction.guildId,
+              threadId: interaction.channelId,
+              playerToBetOn: whoTheyBetOn,
+            })
+          )
+          .setTitle('Wager');
+        // Add components to modal
+        const textInput =
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('wager_amount')
+              .setMinLength(1)
+              .setStyle(TextInputStyle.Short)
+              .setLabel('How much do you want to wager?')
+          );
+
+        modal.addComponents(textInput);
+        // Show the modal to the user
+        try {
+          await interaction.showModal(modal);
+        } catch (err) {
+          console.error(err);
+        }
+        break;
     }
   }
 
   if (interaction.isButton()) {
     const { action, guildId, threadId } = parseButtonId(interaction.customId);
+
+    const duelThread = await discordService.findDuelThread(
+      interaction.guild,
+      interaction?.channelId
+    );
 
     if (!duelThread?.id) {
       throw new Error('duelThread.id is null');
@@ -184,6 +298,52 @@ client.on('interactionCreate', async (interaction) => {
 
     const { duelService } = res;
     const playerIds = duelService.getPlayerIdsInDuel(duelThread?.id);
+
+    if (action === 'wager') {
+      const wagerService = new WagerService(
+        goldManager,
+        wagerManager,
+        duelService
+      );
+      const canAcceptWagers = await wagerService.canAcceptWagers(threadId);
+
+      if (!canAcceptWagers) {
+        await interaction.reply({
+          content: 'Wagers are no longer being accepted',
+          ephemeral: true,
+        });
+        return;
+      }
+      const selectMenu =
+        new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId(
+              createButtonId({
+                action,
+                guildId: interaction.guildId,
+                threadId: interaction.channelId,
+                counter: 0,
+              })
+            )
+            .setPlaceholder('Select a duelist')
+            .addOptions(
+              playerIds.map((playerId) => {
+                const member = interaction.guild?.members.cache.get(playerId);
+                if (!member) throw new Error('member is null');
+                return new StringSelectMenuOptionBuilder()
+                  .setLabel(member.displayName)
+                  .setValue(playerId);
+              })
+            )
+        );
+
+      // Send the reply
+      await interaction.reply({
+        content: 'Who do you bet on?',
+        components: [selectMenu],
+        ephemeral: true,
+      });
+    }
 
     if (interaction.guildId !== guildId || interaction.channelId !== threadId) {
       interaction.reply({
@@ -261,8 +421,18 @@ client.on('interactionCreate', async (interaction) => {
             })
           );
 
+          const wagerButton = createWagerButton(
+            createButtonId({
+              guildId: interaction.guildId,
+              action: 'wager',
+              threadId: interaction.channelId,
+              counter: duelService.getCounter(),
+            })
+          );
+
           const row = new ActionRowBuilder().addComponents(
-            rollForInitativeButton
+            rollForInitativeButton,
+            wagerButton
           );
 
           interaction.reply(`All players are now ready!`);
@@ -394,6 +564,17 @@ client.on('interactionCreate', async (interaction) => {
       });
       break;
     }
+    case 'test': {
+      break;
+    }
+    case 'inventory': {
+      await interaction.reply({
+        embeds: [inventoryEmbed],
+        components: [...(getInventoryButtonRows() as any)],
+        ephemeral: true,
+      });
+      break;
+    }
     case 'buy': {
       break;
     }
@@ -462,6 +643,12 @@ client.on('interactionCreate', async (interaction) => {
       // Create new instances for the duel
       const playerManager = new PlayerManager();
       const duelService = new DuelService(duelRepository, playerManager);
+
+      const wagerService = new WagerService(
+        goldManager,
+        wagerManager,
+        duelService
+      );
 
       // Store the instances in the map
       duelsServicesMap.set(duelThread.id, { duelService, playerManager });
@@ -719,7 +906,7 @@ async function handleAttack(
     ? defaultDice
     : interaction.options.getString('dice');
   const { roll, status, nextPlayer, description, isPlayerDead } =
-    duelService.attemptToHit({
+    await duelService.attemptToHit({
       duelId: duelThread.id,
       attackerId: interaction.user.id,
       defenderId: targetId
@@ -762,6 +949,14 @@ async function handleAttack(
     });
 
     if (isPlayerDead) {
+      const wagerService = new WagerService(
+        goldManager,
+        wagerManager,
+        duelService
+      );
+      const duelWinManager = new DuelWinManager(duelService, wagerService);
+
+      duelWinManager.handleWin(interaction.channelId);
       // end game
       await interaction.reply({
         content: `${description}\n\n<@${nextPlayer?.getId()}> wins!`,
@@ -769,10 +964,7 @@ async function handleAttack(
       });
       await duelThread.setLocked(true);
       if (!nextPlayer) throw new Error('nextPlayer is null');
-      await goldManager.awardGold(
-        nextPlayer?.getId(),
-        config.amountOfGoldForWin
-      );
+      duelWinManager.handleWin(interaction.channelId);
     }
 
     await interaction.reply({
@@ -853,7 +1045,7 @@ async function handleRollForDamage({
     targetId,
     winnerId,
     nextPlayerId,
-  } = duelService.rollFordamage({
+  } = await duelService.rollFordamage({
     duelId: duelThread.id,
     attackerId: interaction.user.id,
     sidedDie: dice,
@@ -901,7 +1093,14 @@ async function handleRollForDamage({
     );
     // lock the thread bc the game is over
     await duelThread.setLocked(true);
-    await goldManager.awardGold(winnerId, config.amountOfGoldForWin);
+    const wagerService = new WagerService(
+      goldManager,
+      wagerManager,
+      duelService
+    );
+    const duelWinManager = new DuelWinManager(duelService, wagerService);
+
+    duelWinManager.handleWin(interaction.channelId);
     return;
   }
 }
