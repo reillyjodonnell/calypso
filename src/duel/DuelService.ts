@@ -21,6 +21,7 @@ export const NOT_ATTACKERS_TURN = 'NOT_ATTACKERS_TURN';
 export const NOT_PLAYERS_TURN = 'NOT_PLAYERS_TURN';
 export const TARGET_DEAD = 'TARGET_DEAD';
 export const TARGET_HIT = 'TARGET_HIT';
+export const DUEL_INVALID = 'DUEL_INVALID';
 
 export type DuelStatus =
   | typeof DUEL_STARTED
@@ -35,7 +36,8 @@ export type DuelStatus =
   | typeof ATTACK_HITS
   | typeof ATTACK_MISSES
   | typeof NOT_ATTACKERS_TURN
-  | typeof NOT_PLAYERS_TURN;
+  | typeof NOT_PLAYERS_TURN
+  | typeof DUEL_INVALID;
 
 export class DuelService {
   private counter = 0;
@@ -58,10 +60,19 @@ export class DuelService {
     challengerId: string;
     challengedId: string;
     duelId: string;
-  }): { status: typeof DUEL_STARTED } {
+  }): { status: | typeof DUEL_STARTED
+                | typeof DUEL_INVALID} {
+
+    if (challengedId === challengerId) {
+      return {
+        status: DUEL_INVALID
+      }
+    }
+
     const duel = new Duel(duelId);
     const challenger = this.playerManager.addPlayer(challengerId);
     const challenged = this.playerManager.addPlayer(challengedId);
+
     duel.addPlayer(challenger, CHALLENGER);
     duel.addPlayer(challenged, CHALLENGED);
 
