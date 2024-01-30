@@ -41,6 +41,13 @@ export class Duel {
     return typeof initative === 'number';
   }
 
+  public hasAnyPlayerRolledForInitiative() {
+    // check if any players have rolled for initiative
+    return this.getPlayersIds().some((playerId) =>
+      this.hasPlayerRolledForInitiative(playerId)
+    );
+  }
+
   public setTurnOrder(order: Player[]) {
     this.turnOrder = order;
   }

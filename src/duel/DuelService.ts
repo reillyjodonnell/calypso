@@ -1,5 +1,6 @@
 import { parseDieAndRoll } from '../..';
 import { Player, PlayerManager } from '../player/player';
+import { WagerService } from '../wager/WagerService';
 import { CHALLENGED, CHALLENGER, Duel } from './Duel';
 import { DuelRepository } from './DuelRepository';
 
@@ -50,6 +51,7 @@ export class DuelService {
     this.counter++;
     return count;
   }
+
   challengePlayer({
     challengerId,
     challengedId,
@@ -97,14 +99,8 @@ export class DuelService {
       };
     }
 
-    // make sure the player hasn't already accepted the duel
-    const hasPlayerAcceptedDuel = duel.isPlayerReady(challengedId);
-    if (hasPlayerAcceptedDuel) {
-      return {
-        status: ALREADY_ACCEPTED_DUEL,
-      };
-    }
     const isPlayerInDuel = duel.isPlayerPartOfDuel(challengedId);
+
     if (!isPlayerInDuel) {
       return {
         status: PLAYER_NOT_FOUND,
@@ -122,6 +118,13 @@ export class DuelService {
     if (challengedRole.role !== CHALLENGED) {
       return {
         status: PLAYER_NOT_CHALLENGED,
+      };
+    }
+    // make sure the player hasn't already accepted the duel
+    const hasPlayerAcceptedDuel = duel.isPlayerReady(challengedId);
+    if (hasPlayerAcceptedDuel) {
+      return {
+        status: ALREADY_ACCEPTED_DUEL,
       };
     }
     duel.setPlayerReady(challenged);
@@ -219,7 +222,7 @@ export class DuelService {
       targets,
     };
   }
-  attemptToHit({
+  async attemptToHit({
     duelId,
     attackerId,
     defenderId,
@@ -229,7 +232,7 @@ export class DuelService {
     attackerId: string;
     defenderId: string;
     sidedDie: string | null;
-  }): {
+  }): Promise<{
     status:
       | typeof DUEL_NOT_FOUND
       | typeof PLAYER_NOT_FOUND
@@ -242,7 +245,7 @@ export class DuelService {
     nextPlayer?: Player;
     description?: string;
     isPlayerDead?: boolean;
-  } {
+  }> {
     const duel = this.duelRepository.getById(duelId);
     if (!duel) {
       return {
@@ -314,7 +317,7 @@ export class DuelService {
       nextPlayer: duel.getCurrentTurnPlayerId(),
     };
   }
-  rollFordamage({
+  async rollFordamage({
     duelId,
     attackerId,
     sidedDie,
@@ -324,7 +327,7 @@ export class DuelService {
     attackerId: string;
     sidedDie: string | null;
     criticalHit: boolean;
-  }): {
+  }): Promise<{
     status:
       | typeof DUEL_NOT_FOUND
       | typeof PLAYER_NOT_FOUND
@@ -336,7 +339,7 @@ export class DuelService {
     winnerId?: string | null;
     roll?: number;
     nextPlayerId?: string;
-  } {
+  }> {
     const duel = this.duelRepository.getById(duelId);
     if (!duel) {
       return {
@@ -351,8 +354,6 @@ export class DuelService {
     }
     const roll = parseDieAndRoll(sidedDie);
     const criticalHitRoll = parseDieAndRoll(sidedDie);
-    console.log('roll ', roll);
-    console.log('criticalHitRoll ', criticalHitRoll);
 
     const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
     if (attackerId !== currentTurnPlayerId.getId()) {
@@ -389,21 +390,7 @@ export class DuelService {
       nextPlayerId,
     };
   }
-  determineWinner(duelId: string): { winnerId: string | null } {
-    const duel = this.duelRepository.getById(duelId);
-    if (!duel) {
-      throw new Error('Duel not found');
-    }
 
-    const alivePlayers = duel
-      .getPlayers()
-      .filter((player) => !this.playerManager.isPlayerDead(player));
-    if (alivePlayers.length === 1) {
-      return { winnerId: alivePlayers[0].getId() };
-    }
-
-    return { winnerId: null };
-  }
   healingRoll({
     duelId,
     playerId,
@@ -471,5 +458,29 @@ export class DuelService {
       throw new Error('Duel not found');
     }
     return duel.getPlayersIds();
+  }
+
+  determineWinner(duelId: string): { winnerId: string | null } {
+    const duel = this.duelRepository.getById(duelId);
+    if (!duel) {
+      throw new Error('Duel not found');
+    }
+
+    const alivePlayers = duel
+      .getPlayers()
+      .filter((player) => !this.playerManager.isPlayerDead(player));
+    if (alivePlayers.length === 1) {
+      return { winnerId: alivePlayers[0].getId() };
+    }
+
+    return { winnerId: null };
+  }
+  haveAnyPlayersRolledForInitiative(duelId: string): boolean {
+    const duel = this.duelRepository.getById(duelId);
+    if (!duel) {
+      throw new Error('Duel not found');
+    }
+
+    return duel.hasAnyPlayerRolledForInitiative();
   }
 }

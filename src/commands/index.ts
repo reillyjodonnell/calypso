@@ -4,6 +4,10 @@ export const goldCommand = new SlashCommandBuilder()
   .setName('gold')
   .setDescription('View your gold');
 
+export const inventoryCommand = new SlashCommandBuilder()
+  .setName('inventory')
+  .setDescription('View your inventory');
+
 export const storeCommand = new SlashCommandBuilder()
   .setName('store')
   .setDescription('Displays items available for purchase');
