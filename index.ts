@@ -508,8 +508,7 @@ client.on('interactionCreate', async (interaction) => {
           content: `<@${challengerId}>, <@${user.id}>, your duel has been set up here. Please use this thread for all duel-related commands and interactions.\n\n<@${user.id}> please use /accept to accept the duel or use the buttons below.`,
           components: [row as any], // Send the button with the message
         });
-      }
-      else if (res.status === DUEL_INVALID) {
+      } else if (res.status === DUEL_INVALID) {
         await interaction.reply({
           content: 'You cannot duel yourself!',
           ephemeral: true,
