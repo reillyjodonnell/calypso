@@ -1,4 +1,4 @@
-import { parseDieAndRoll } from '../..';
+import { parseDieAndRoll } from '../dice';
 import { Player, PlayerManager } from '../player/player';
 import { CHALLENGED, CHALLENGER, Duel } from './Duel';
 import { DuelRepository } from './DuelRepository';
@@ -60,13 +60,11 @@ export class DuelService {
     challengerId: string;
     challengedId: string;
     duelId: string;
-  }): { status: | typeof DUEL_STARTED
-                | typeof DUEL_INVALID} {
-
+  }): { status: typeof DUEL_STARTED | typeof DUEL_INVALID } {
     if (challengedId === challengerId) {
       return {
-        status: DUEL_INVALID
-      }
+        status: DUEL_INVALID,
+      };
     }
 
     const duel = new Duel(duelId);
