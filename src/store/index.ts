@@ -69,7 +69,7 @@ export const storeEmbed = new EmbedBuilder()
   .addFields(
     { name: '\u200B', value: '\u200B' },
     {
-      name: '🌟 Featured Items (resets in 06:12:32)',
+      name: '🌟 Featured Items',
       value: 'Items bestowed with divine powers, available for a limited time.',
     },
     ...featuredItems.map((item) => ({
