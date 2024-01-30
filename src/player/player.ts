@@ -1,6 +1,7 @@
 type PlayerStatus = 'idle' | 'attacking' | 'healing' | 'dead';
 const MAX_HEALTH = 14;
 export class Player {
+  private readonly maxHealth = MAX_HEALTH;
   private health = MAX_HEALTH;
   private ac = 11;
   private numberOfHeals = 2;
@@ -17,6 +18,10 @@ export class Player {
   }
   public getStatus() {
     return this.status;
+  }
+
+  public getMaxHealth() {
+    return this.maxHealth;
   }
 
   public getId() {
@@ -167,6 +172,18 @@ export class PlayerManager {
     const player = this.getPlayer(playerId);
     if (!player) throw new Error("Player doesn't exist");
     player.setStatus('attacking');
+  }
+
+  public getPlayerHealthById(playerId: string) {
+    const player = this.getPlayer(playerId);
+    if (!player) throw new Error("Player doesn't exist");
+    return player.getHealth();
+  }
+
+  public getPlayerMaxHealthById(playerId: string) {
+    const player = this.getPlayer(playerId);
+    if (!player) throw new Error("Player doesn't exist");
+    return player.getMaxHealth();
   }
 
   executeRandomOutcome(playerId: string): {

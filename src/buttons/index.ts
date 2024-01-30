@@ -142,3 +142,12 @@ export function createRollButton(id: string, isDisabled: boolean = false) {
     .setEmoji('🎲')
     .setDisabled(isDisabled);
 }
+
+export function createWagerButton(id: string, isDisabled: boolean = false) {
+  return new ButtonBuilder()
+    .setCustomId(id)
+    .setLabel('Wager')
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji('💰')
+    .setDisabled(isDisabled);
+}
