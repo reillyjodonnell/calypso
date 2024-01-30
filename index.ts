@@ -240,7 +240,10 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         if (status === PLAYER_NOT_FOUND) {
-          // some dick is trying to talk. Only players in thread can talk though
+          await interaction.reply(
+            'Quiet now, the match is about to begin! Wait your turn.'
+          );
+          break;
         }
 
         if (status === DUEL_ACCEPTED) {
