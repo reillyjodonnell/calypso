@@ -123,7 +123,7 @@ export class PlayerManager {
   public doesAttackHitPlayer(defender: Player, roll: number) {
     return roll >= defender.getAC();
   }
-  public attackTarget(attacker: Player, damage: number) {
+  public attackTarget(attacker: Player, damage: number, critRoll: number) {
     // get the target
     const targetId = attacker.getTarget();
     if (!targetId) {
@@ -135,7 +135,7 @@ export class PlayerManager {
       throw new Error("Target doesn't exist");
     }
     // attack the target
-    const targetHealthRemaining = this.attackPlayer(target, damage);
+    const targetHealthRemaining = this.attackPlayer(target, damage + critRoll);
     const isTargetDead = this.isPlayerDead(target);
 
     return { targetHealthRemaining, isTargetDead, targetId };
