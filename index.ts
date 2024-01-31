@@ -1030,6 +1030,7 @@ async function handleRollForDamage({
   const {
     status,
     roll,
+    criticalHitRoll,
     targetHealthRemaining,
     targetId,
     winnerId,
@@ -1045,6 +1046,9 @@ async function handleRollForDamage({
     await interaction.reply("It's not your turn!");
     return;
   }
+  if (!roll) {
+    throw new Error('Roll not supplied');
+  }
   if (status === 'TARGET_HIT') {
     const row = getAllButtonOptions({
       guildId: interaction.guildId,
@@ -1054,8 +1058,17 @@ async function handleRollForDamage({
       healId: duelService.getCounter(),
       leaveId: duelService.getCounter(),
     });
+    if (!criticalHit) {
+      await interaction.reply({
+        content: `You rolled a ${roll} and dealt ${roll} damage! <@${targetId}> has ${targetHealthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack or /heal to heal yourself`,
+        components: [row as any],
+      });
+      return;
+    }
     await interaction.reply({
-      content: `You rolled a ${roll} and dealt ${roll} damage! <@${targetId}> has ${targetHealthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack or /heal to heal yourself`,
+      content: `You rolled a ${roll} + ${criticalHitRoll} and dealt ${
+        roll + criticalHitRoll!
+      } damage! <@${targetId}> has ${targetHealthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack or /heal to heal yourself`,
       components: [row as any],
     });
 

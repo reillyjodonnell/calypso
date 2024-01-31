@@ -110,7 +110,7 @@ export class PlayerManager {
   public doesAttackHitPlayer(defender: Player, roll: number) {
     return roll >= defender.getAC();
   }
-  public attackTarget(attacker: Player, damage: number) {
+  public attackTarget(attacker: Player, damage: number, critRoll: number) {
     // get the target
     const targetId = attacker.getTarget();
     if (!targetId) {

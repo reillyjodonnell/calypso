@@ -259,8 +259,8 @@ export class DuelService {
         status: PLAYER_NOT_FOUND,
       };
     }
-    const roll = parseDieAndRoll(sidedDie);
-
+    //const roll = parseDieAndRoll(sidedDie);
+    const roll: number = 20;
     const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
     if (attackerId !== currentTurnPlayerId.getId()) {
       return { status: NOT_ATTACKERS_TURN };
@@ -339,6 +339,7 @@ export class DuelService {
     targetId?: string;
     winnerId?: string | null;
     roll?: number;
+    criticalHitRoll?: number;
     nextPlayerId?: string;
   }> {
     const duel = this.duelRepository.getById(duelId);
@@ -364,7 +365,8 @@ export class DuelService {
     const { isTargetDead, targetHealthRemaining, targetId } =
       this.playerManager.attackTarget(
         attacker,
-        roll + (criticalHit ? criticalHitRoll : 0)
+        roll,
+        criticalHit ? criticalHitRoll : 0
       );
     this.playerManager.clearPlayerTarget(attackerId);
     duel.nextTurn();
@@ -378,7 +380,8 @@ export class DuelService {
         targetHealthRemaining,
         targetId,
         winnerId,
-        roll: roll + (criticalHit ? criticalHitRoll : 0),
+        roll,
+        criticalHitRoll: criticalHit ? criticalHitRoll : 0,
         nextPlayerId,
       };
     }
@@ -387,7 +390,8 @@ export class DuelService {
       status: 'TARGET_HIT',
       targetHealthRemaining,
       targetId,
-      roll: roll + (criticalHit ? criticalHitRoll : 0),
+      roll,
+      criticalHitRoll: criticalHit ? criticalHitRoll : 0,
       nextPlayerId,
     };
   }
