@@ -1,4 +1,4 @@
-import { parseDieAndRoll } from '../..';
+import { parseDieAndRoll } from '../dice/dice';
 import { Player, PlayerManager } from '../player/player';
 import { WagerService } from '../wager/WagerService';
 import { CHALLENGED, CHALLENGER, Duel } from './Duel';
