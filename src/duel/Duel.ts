@@ -1,4 +1,4 @@
-import { parseDieAndRoll } from '../..';
+import { parseDieAndRoll } from '../dice/dice.ts';
 import { Player } from '../player/player';
 
 export const CHALLENGED = 'CHALLENGED';

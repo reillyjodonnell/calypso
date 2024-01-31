@@ -1,1 +1,1 @@
-import { roll } from '.';
+import { describe, expect, it } from 'bun:test';

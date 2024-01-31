@@ -863,22 +863,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-// This represents all the types of dice we can roll
-type DieTypes = 4 | 6 | 8 | 10 | 12 | 20 | 100;
-
-export function roll(typeOfDie: DieTypes) {
-  return Math.floor(Math.random() * typeOfDie) + 1;
-}
-
 client.login(TOKEN);
-
-export function parseDieAndRoll(die: string | null) {
-  if (!die) throw new Error('die is null');
-
-  const sides = parseInt(die.slice(1));
-  const result = roll(sides as DieTypes);
-  return result;
-}
 
 async function handleAttack(
   interaction: any,
@@ -972,7 +957,7 @@ async function handleAttack(
     }
 
     await interaction.reply({
-      content: `${description}\n\n<@${nextPlayer?.getId()}> it's your turn! Use /attack to begin the attack`,
+      content: `You rolled a ${roll} and have failed!\n\n${description}\n\n<@${nextPlayer?.getId()}> it's your turn! Use /attack to begin the attack`,
       components: [row as any],
     });
 
