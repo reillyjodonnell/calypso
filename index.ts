@@ -957,7 +957,7 @@ async function handleAttack(
     }
 
     await interaction.reply({
-      content: `${description}\n\n<@${nextPlayer?.getId()}> it's your turn! Use /attack to begin the attack`,
+      content: `You rolled a ${roll} and have failed!\n\n${description}\n\n<@${nextPlayer?.getId()}> it's your turn! Use /attack to begin the attack`,
       components: [row as any],
     });
 
