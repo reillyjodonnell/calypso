@@ -1083,15 +1083,33 @@ async function handleRollForDamage({
       healId: duelService.getCounter(),
       leaveId: duelService.getCounter(),
     });
+    if (!criticalHit) {
+      await interaction.reply({
+        content: `You dealt ${roll} damage. You see the light leave their eyes. You killed <@${targetId}>!\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack or /heal to heal yourself`,
+        components: [row as any],
+      });
+      return;
+    }
     await interaction.reply({
-      content: `You dealt ${roll} damage. You see the light leave their eyes. You killed <@${targetId}>!\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack or /heal to heal yourself`,
+      content: `You rolled a ${roll} + ${criticalHitRoll} and dealt ${
+        roll + criticalHitRoll!
+      } damage! You see the light leave their eyes. You killed <@${targetId}>!\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack or /heal to heal yourself`,
       components: [row as any],
     });
     return;
   }
+
   if (status === 'TARGET_DEAD' && winnerId) {
+    if (!criticalHit) {
+      await interaction.reply(
+        `You dealt ${roll} damage. You see the light leave their eyes. You killed <@${targetId}>! <@${winnerId}> wins!`
+      );
+      return;
+    }
     await interaction.reply(
-      `You dealt ${roll} damage. You see the light leave their eyes. You killed <@${targetId}>! <@${winnerId}> wins!`
+      `You rolled a ${roll} + ${criticalHitRoll} and dealt ${
+        roll + criticalHitRoll!
+      } damage! You see the light leave their eyes. You killed <@${targetId}>! <@${winnerId}> wins!`
     );
     // lock the thread bc the game is over
     await duelThread.setLocked(true);
