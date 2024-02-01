@@ -9,7 +9,7 @@ import {
   StringSelectMenuInteraction,
   StringSelectMenuOptionBuilder,
 } from 'discord.js';
-import { PlayerRepository } from './player/PlayerRepository';
+import { PlayerRepository } from '../player/PlayerRepository';
 import {
   ALL_PLAYERS_READY,
   ALL_PLAYERS_ROLLED,
@@ -27,8 +27,8 @@ import {
   PLAYER_NOT_CHALLENGED,
   PLAYER_NOT_FOUND,
   PLAYER_ROLLED,
-} from './duel/DuelService';
-import { DiscordService } from './discord/DiscordService';
+} from './DuelService';
+import { DiscordService } from '../discord/DiscordService';
 import {
   createAcceptButton,
   createButtonId,
@@ -37,21 +37,22 @@ import {
   createWagerButton,
   getAllButtonOptions,
   parseButtonId,
-} from './buttons';
-import { DuelRepository } from './duel/DuelRepository';
-import { PlayerService } from './player/PlayerService';
-import { DuelWinManager } from './duel/DuelWinManager';
+} from '../buttons';
+import { DuelRepository } from './DuelRepository';
+import { PlayerService } from '../player/PlayerService';
+import { DuelWinManager } from './DuelWinManager';
 import {
   FALL_DOWN,
   NO_EFFECT,
   SELF_HARM,
-} from './randomEvents/RandomEventsGenerator';
+} from '../randomEvents/RandomEventsGenerator';
+import { WagerService } from '../wager/WagerService';
 
 const DEFAULT_DIE = 'd20';
 const DEFAULT_HEAL_DIE = 'd4';
 const DEFAULT_DAMAGE_DIE = 'd6';
 
-export class InteractionHandler {
+export class DuelInteractionHandler {
   constructor(
     private duelRepository: DuelRepository,
     private playerRepository: PlayerRepository,
@@ -70,7 +71,7 @@ export class InteractionHandler {
       guild: interaction.guild,
     });
 
-    const { status, players, duel } = await this.duelService.challengePlayer({
+    const { status, players, duel } = this.duelService.challengePlayer({
       challengedId: user.id,
       challengerId,
       duelId: duelThread.id,
@@ -120,7 +121,7 @@ export class InteractionHandler {
       );
 
       await duelThread.send({
-        content: `<@${challengerId}>, <@${user.id}>, your duel has been set up here. Please use this thread for all duel-related commands and interactions.\n\n<@${user.id}> please use /accept to accept the duel or use the buttons below.`,
+        content: `<@${challengerId}>, <@${user.id}>, your duel has been set up here. Please use this thread for all duel-related commands and interactions.\n\n<@${user.id}> accept the duel to begin.`,
         components: [row as any], // Send the button with the message
       });
     } else if (status === DUEL_INVALID) {
@@ -171,7 +172,7 @@ export class InteractionHandler {
       status,
       ids,
       duel: updatedDuel,
-    } = await this.duelService.acceptDuel({
+    } = this.duelService.acceptDuel({
       challengedId: userId,
       duel,
     });
@@ -242,11 +243,13 @@ export class InteractionHandler {
         wagerButton
       );
 
-      interaction.reply(`All players are now ready!`);
+      interaction.reply(
+        `All players are now ready!\n\nWagering is open until a player rolls for initiative! Good luck!`
+      );
       const mentionPlayers = ids?.map((id: string) => `<@${id}>`).join(' ');
       try {
         await duelThread?.send({
-          content: `${mentionPlayers}, roll for initiative using /initiative d20`,
+          content: `${mentionPlayers}, roll for initiative below!`,
           components: [row as any], // Send the button with the message
         });
       } catch (err) {
@@ -279,12 +282,22 @@ export class InteractionHandler {
 
     const duel = await this.duelRepository.getById(duelThread.id);
 
+    if (!duel) {
+      await interaction.reply({
+        content: 'Duel not found. Please try again',
+        ephemeral: true,
+      });
+      return;
+    }
+
     const { result, status, playerToGoFirst } =
-      await this.duelService.rollForInitiative({
+      this.duelService.rollForInitiative({
         duel,
         playerId: interaction.user.id,
         sidedDie: dice,
       });
+
+    await this.duelRepository.save(duel);
 
     if (status === PLAYER_ALREADY_ROLLED) {
       await interaction.reply({
@@ -372,7 +385,18 @@ export class InteractionHandler {
       });
       return;
     }
-    const player = await this.playerRepository.getById(interaction.user.id);
+    const player = await this.playerRepository.getById(
+      duelThread.id,
+      interaction.user.id
+    );
+
+    if (!player) {
+      await interaction.reply({
+        content: 'You are not a participant in the duel.',
+        ephemeral: true,
+      });
+      return;
+    }
 
     if (player?.getId() !== duel.getCurrentTurnPlayerId()) {
       await interaction.reply({
@@ -384,23 +408,36 @@ export class InteractionHandler {
 
     const targets = duel.getPlayersIds();
 
-    // Create options for the select menu
-    const options = targets?.map((id) => {
-      const targetMember = interaction?.guild?.members.cache.get(id); // Retrieve the member object from the cache
+    const options = await Promise.all(
+      targets.map(async (id) => {
+        let targetMember = interaction?.guild?.members.cache.get(id);
+        if (!targetMember) {
+          try {
+            targetMember = await interaction?.guild?.members.fetch(id);
+          } catch (error) {
+            console.error(`Error fetching member with ID ${id}: ${error}`);
+            return null;
+          }
+        }
 
-      if (!targetMember) {
-        console.error(`Member with ID ${id} not found.`);
-        return null; // Or handle this case as you see fit
-      }
+        if (!targetMember) {
+          console.error(`Member with ID ${id} not found.`);
+          return null;
+        }
 
-      const displayName = targetMember.displayName; // Get the display name
-      if (!displayName) throw new Error('displayName is null');
-      return new StringSelectMenuOptionBuilder()
-        .setLabel(displayName)
-        .setValue(id);
-    });
+        const displayName = targetMember.displayName;
+        if (!displayName) throw new Error('displayName is null');
 
-    if (!options) throw new Error('options is null');
+        return new StringSelectMenuOptionBuilder()
+          .setLabel(displayName)
+          .setValue(id);
+      })
+    );
+
+    // Filter out any null options
+    const validOptions = options.filter((option) => option !== null);
+
+    if (!validOptions) throw new Error('No valid options generated');
 
     const selectMenu =
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
@@ -409,12 +446,12 @@ export class InteractionHandler {
             createButtonId({
               action,
               guildId: interaction.guildId,
-              threadId: interaction.channelId,
+              threadId: duelThread.id,
               counter: this.duelService.getCounter(),
             })
           )
           .setPlaceholder('Select a target')
-          .addOptions(...(options as StringSelectMenuOptionBuilder[]))
+          .addOptions(validOptions as StringSelectMenuOptionBuilder[])
       );
 
     // Send the reply
@@ -444,11 +481,16 @@ export class InteractionHandler {
       return;
     }
 
+    if (!interaction.guildId) throw new Error('interaction.guildId is null');
+
     const duel = await this.duelRepository.getById(duelThread.id);
     const target = interaction.values[0];
 
     // whoever they selected. Hope they didn't fuck up lmao
-    const playerTarget = await this.playerRepository.getById(target);
+    const playerTarget = await this.playerRepository.getById(
+      duelThread.id,
+      target
+    );
 
     const {
       status,
@@ -463,6 +505,8 @@ export class InteractionHandler {
       sidedDie: defaultHealDie,
     });
     if (status === 'NOT_PLAYERS_TURN') {
+      console.log('helaing roll');
+
       await interaction.reply({
         content: "It's not your turn!",
         ephemeral: true,
@@ -502,7 +546,7 @@ export class InteractionHandler {
       });
 
       await interaction.reply({
-        content: `You rolled a ${roll} and healed ${roll} health! You have ${healthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack or /heal to heal yourself`,
+        content: `You rolled a ${roll} and healed ${roll} health! You have ${healthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`,
         components: [row as any],
       });
     }
@@ -524,9 +568,18 @@ export class InteractionHandler {
       );
       return;
     }
+
+    if (!interaction.guildId) throw new Error('interaction.guildId is null');
+
     const duel = await this.duelRepository.getById(duelThread.id);
-    const attacker = await this.playerRepository.getById(interaction.user.id);
-    const defender = await this.playerRepository.getById(targetId);
+    const attacker = await this.playerRepository.getById(
+      duelThread.id,
+      interaction.user.id
+    );
+    const defender = await this.playerRepository.getById(
+      duelThread.id,
+      targetId
+    );
 
     if (!attacker || !defender || !duel) {
       await interaction.reply({
@@ -535,7 +588,7 @@ export class InteractionHandler {
       });
       return;
     }
-    const { roll, status, nextPlayerId } = await this.duelService.attemptToHit({
+    const { roll, status, nextPlayerId } = this.duelService.attemptToHit({
       duel,
       attacker,
       defender,
@@ -551,6 +604,7 @@ export class InteractionHandler {
     }
 
     if (status === 'NOT_ATTACKERS_TURN') {
+      console.log('NOT ATTACKERS TURN STATUS');
       await interaction.reply("It's not your turn!");
       return;
     }
@@ -567,10 +621,9 @@ export class InteractionHandler {
       );
       const row = new ActionRowBuilder().addComponents(rollButton);
       await interaction.reply({
-        content: `You rolled a ${roll}. Critical hit! Damage is doubled. Roll for damage using /roll_for_damage 2d6`,
+        content: `You rolled a ${roll}. Critical hit! Damage is doubled. Roll for damage below!`,
         components: [row as any],
       });
-
       return;
     }
 
@@ -617,19 +670,19 @@ export class InteractionHandler {
       switch (status) {
         case SELF_HARM:
           await interaction.reply({
-            content: `You swing at your target, but miss and hit yourself for ${damage} damage! You have ${healthRemaining} health remaining.\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack`,
+            content: `You swing at your target, but miss and hit yourself for ${damage} damage! You have ${healthRemaining} health remaining.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`,
             components: [row as any],
           });
           break;
         case NO_EFFECT:
           await interaction.reply({
-            content: `You swing at your target and miss terribly. Somehow you recovered!\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack`,
+            content: `You swing at your target and miss terribly. Somehow you recovered!\n\n<@${nextPlayerId}> it's your turn!`,
             components: [row as any],
           });
           break;
         case FALL_DOWN:
           await interaction.reply({
-            content: `You swing at your target and miss terribly. You fall down and lose your turn!\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack`,
+            content: `You swing at your target and miss terribly. You fall down and lose your turn!\n\n<@${nextPlayerId}> it's your turn!`,
             components: [row as any],
           });
           break;
@@ -650,7 +703,7 @@ export class InteractionHandler {
       );
       const row = new ActionRowBuilder().addComponents(rollButton);
       await interaction.reply({
-        content: `You rolled a ${roll} and hit! Roll for damage using /roll_for_damage d6`,
+        content: `You rolled a ${roll} and hit! Roll for damage below!`,
         components: [row as any],
       });
       return;
@@ -665,7 +718,7 @@ export class InteractionHandler {
     });
 
     await interaction.reply({
-      content: `You rolled a ${roll} and missed! :(\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack`,
+      content: `You rolled a ${roll} and missed! :(\n\n<@${nextPlayerId}> it's your turn!`,
       components: [row as any],
     });
   }
@@ -697,8 +750,12 @@ export class InteractionHandler {
       });
       return;
     }
+    if (!interaction.guildId) throw new Error('interaction.guildId is null');
 
-    const attacker = await this.playerRepository.getById(interaction.user.id);
+    const attacker = await this.playerRepository.getById(
+      duelThread.id,
+      interaction.user.id
+    );
     if (!attacker) {
       interaction.reply({
         content: 'Uh oh. We had troubles. Try again!',
@@ -716,8 +773,12 @@ export class InteractionHandler {
       return;
     }
 
-    const defender = await this.playerRepository.getById(res.targetId);
+    const defender = await this.playerRepository.getById(
+      duelThread.id,
+      res.targetId
+    );
     if (!defender) {
+      console.error('DEFENDER IS NULL');
       await interaction.reply({
         content: 'Something went wrong! Try again!',
         ephemeral: true,
@@ -733,25 +794,28 @@ export class InteractionHandler {
       return;
     }
 
-    const { status, roll, targetHealthRemaining, nextPlayerId } =
-      await this.duelService.rollFordamage({
-        duel,
-        attacker,
-        defender,
-        sidedDie: DEFAULT_DAMAGE_DIE,
-        criticalHit,
-      });
+    const {
+      status,
+      roll,
+      criticalHitRoll,
+      targetHealthRemaining,
+      nextPlayerId,
+    } = this.duelService.rollFordamage({
+      duel,
+      attacker,
+      defender,
+      sidedDie: DEFAULT_DAMAGE_DIE,
+      criticalHit,
+    });
 
     this.duelRepository.save(duel);
     this.playerRepository.save(attacker, duelThread.id);
     this.playerRepository.save(defender, duelThread.id);
 
-    const { winnerId } = await this.duelService.determineWinner([
-      attacker,
-      defender,
-    ]);
+    const { winnerId } = this.duelService.determineWinner([attacker, defender]);
 
     if (status === 'NOT_ATTACKERS_TURN') {
+      console.log('NOT ATTACKERS TURN STATUS');
       await interaction.reply("It's not your turn!");
       return;
     }
@@ -765,7 +829,11 @@ export class InteractionHandler {
         leaveId: this.duelService.getCounter(),
       });
       await interaction.reply({
-        content: `You rolled a ${roll} and dealt ${roll} damage! <@${defender.getId()}> has ${targetHealthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack or /heal to heal yourself`,
+        content: `You rolled a ${roll} ${
+          criticalHit ? `and a ${criticalHitRoll} ` : ''
+        } and dealt ${
+          roll! + (criticalHit ? criticalHitRoll! : 0)
+        } damage! <@${defender.getId()}> has ${targetHealthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn!`,
         components: [row as any],
       });
     }
@@ -779,14 +847,22 @@ export class InteractionHandler {
         leaveId: this.duelService.getCounter(),
       });
       await interaction.reply({
-        content: `You dealt ${roll} damage. You see the light leave their eyes. You killed <@${defender.getId()}>!\n\n<@${nextPlayerId}> it's your turn! Use /attack to begin the attack or /heal to heal yourself`,
+        content: `You rolled a ${roll} ${
+          criticalHit ? `and a ${criticalHitRoll} ` : ''
+        } and dealt ${
+          roll! + (criticalHit ? criticalHitRoll! : 0)
+        } damage! You see the light leave their eyes. You killed <@${defender.getId()}>!\n\n<@${nextPlayerId}> it's your turn!`,
         components: [row as any],
       });
       return;
     }
     if (status === 'TARGET_DEAD' && winnerId) {
       await interaction.reply(
-        `You dealt ${roll} damage. You see the light leave their eyes. You killed <@${defender.getId()}>! <@${winnerId}> wins!`
+        `You rolled a ${roll} ${
+          criticalHit ? `and a ${criticalHitRoll} ` : ''
+        } and dealt ${
+          roll! + (criticalHit ? criticalHitRoll! : 0)
+        } damage! You see the light leave their eyes. You killed <@${defender.getId()}>! <@${winnerId}> wins!`
       );
       // lock the thread bc the game is over
       await duelThread.setLocked(true);
@@ -795,6 +871,78 @@ export class InteractionHandler {
         defender,
       ]);
       return;
+    }
+  }
+
+  async handleWager(interaction: ButtonInteraction<CacheType>) {
+    const discordService = new DiscordService();
+    const duelThread = await discordService.findDuelThread(
+      interaction.guild,
+      interaction.channelId
+    );
+    if (!duelThread) {
+      await interaction.reply({
+        content: 'Duel not found. Please try again!',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const duel = await this.duelRepository.getById(duelThread.id);
+
+    if (!duel) {
+      await interaction.reply({
+        content: 'Duel not found. Please try again!',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const playerIds = duel.getPlayersIds();
+
+    const canAcceptWagers = duel.getIsBettingOpen();
+    if (!canAcceptWagers) {
+      await interaction.reply({
+        content: 'Wagers are no longer being accepted',
+        ephemeral: true,
+      });
+      return;
+    }
+    const { action, guildId, threadId } = parseButtonId(interaction.customId);
+
+    const selectMenu =
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(
+            createButtonId({
+              action,
+              guildId: interaction.guildId,
+              threadId: interaction.channelId,
+              counter: 0,
+            })
+          )
+          .setPlaceholder('Select a duelist')
+          .addOptions(
+            playerIds.map((playerId) => {
+              const member = interaction.guild?.members.cache.get(playerId);
+              if (!member) throw new Error('member is null');
+              return new StringSelectMenuOptionBuilder()
+                .setLabel(member.displayName)
+                .setValue(playerId);
+            })
+          )
+      );
+    // Send the reply
+    await interaction.reply({
+      content: 'Who do you bet on?',
+      components: [selectMenu],
+      ephemeral: true,
+    });
+    if (interaction.guildId !== guildId || interaction.channelId !== threadId) {
+      interaction.reply({
+        content: 'Wrong thread',
+        ephemeral: true,
+      });
     }
   }
 }

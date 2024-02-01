@@ -155,7 +155,9 @@ export class DuelService {
       };
     }
     const result = duel.rollForInitative(playerId, sidedDie);
+    duel.setIsBettingOpen(false);
     const allPlayersHaveRolled = duel.haveAllPlayersRolledForInitiative();
+
     if (allPlayersHaveRolled) {
       duel.generateTurnOrder();
       return {
@@ -317,6 +319,7 @@ export class DuelService {
       | typeof TARGET_HIT;
     targetHealthRemaining?: number;
     roll?: number;
+    criticalHitRoll?: number;
     nextPlayerId?: string;
   } {
     if (!duel) {
@@ -348,7 +351,8 @@ export class DuelService {
       return {
         status: 'TARGET_DEAD',
         targetHealthRemaining,
-        roll: roll + (criticalHit ? criticalHitRoll : 0),
+        roll,
+        criticalHitRoll: criticalHit ? criticalHitRoll : undefined,
         nextPlayerId,
       };
     }
@@ -356,7 +360,8 @@ export class DuelService {
     return {
       status: 'TARGET_HIT',
       targetHealthRemaining,
-      roll: roll + (criticalHit ? criticalHitRoll : 0),
+      roll,
+      criticalHitRoll: criticalHit ? criticalHitRoll : undefined,
       nextPlayerId,
     };
   }

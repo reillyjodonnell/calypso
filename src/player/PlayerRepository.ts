@@ -15,8 +15,8 @@ export class PlayerRepository {
     await this.redisClient.set(`${threadId}:${player.getId()}`, serializedDuel);
   }
 
-  async getById(duelId: string) {
-    const serializedDuel = await this.redisClient.get(`player:${duelId}`);
+  async getById(duelId: string, playerId: string) {
+    const serializedDuel = await this.redisClient.get(`${duelId}:${playerId}`);
     if (!serializedDuel) return null;
     const duelDTO = JSON.parse(serializedDuel);
     return PlayerDTO.fromDTO(duelDTO);

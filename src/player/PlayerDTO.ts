@@ -1,4 +1,4 @@
-import { MAX_HEALTH, Player, PlayerStatus } from './player';
+import { MAX_HEALTH, Player } from './player';
 
 export class PlayerDTO {
   private id: string;
@@ -8,8 +8,6 @@ export class PlayerDTO {
   private numberOfHeals = 2;
   private healsUsed = 0;
   private targetId: string | null = null;
-  private characterInfo = null; // or some default value
-  private status: PlayerStatus = 'idle';
   constructor(player: Player) {
     this.id = player.getId();
     this.health = player.getHealth();
@@ -18,8 +16,6 @@ export class PlayerDTO {
     this.numberOfHeals = player.getNumberOfHeals();
     this.healsUsed = player.getHealsUsed();
     this.targetId = player.getTarget();
-    this.characterInfo = player.getCharacterInfo();
-    this.status = player.getStatus();
   }
 
   // Optionally, add a method to convert back to a Player instance
@@ -30,9 +26,7 @@ export class PlayerDTO {
     player.setNumberOfHeals(playerDTO.numberOfHeals);
     player.setMaxHealth(playerDTO.maxHealth);
     player.setHealsUsed(playerDTO.healsUsed);
-    player.setTarget(playerDTO.targetId);
-    player.setCharacterInfo(playerDTO.characterInfo);
-    player.setStatus(playerDTO.status);
+    player.setTargetId(playerDTO.targetId ?? '');
     return player;
   }
 }

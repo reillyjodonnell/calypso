@@ -7,7 +7,6 @@ export class Player {
   private numberOfHeals = 2;
   private healsUsed = 0;
   private targetId: string | null = null;
-  private characterInfo = null; // or some default value
 
   constructor(id: string) {
     this.id = id;
@@ -50,16 +49,6 @@ export class Player {
   }
   public setTargetId(targetId: string) {
     this.targetId = targetId;
-  }
-
-  // Method to get character info
-  public getCharacterInfo() {
-    return this.characterInfo;
-  }
-
-  // Method to set character info
-  public setCharacterInfo(info: any) {
-    this.characterInfo = info;
   }
 
   // New method to clear the target

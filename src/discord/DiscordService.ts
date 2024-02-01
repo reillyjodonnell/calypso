@@ -53,8 +53,6 @@ export class DiscordService {
       reason: 'Creating a new thread for a duel',
     });
 
-    duelThread.id;
-
     return duelThread;
   }
 

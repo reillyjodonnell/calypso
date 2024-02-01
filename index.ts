@@ -4,15 +4,15 @@ import {
   Client,
   GatewayIntentBits,
   EmbedBuilder,
-  // InteractionType,
-  // ActionRowBuilder,
-  // StringSelectMenuBuilder,
-  // StringSelectMenuOptionBuilder,
-  // TextInputStyle,
+  InteractionType,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  TextInputStyle,
 } from 'discord.js';
-// import { DuelService } from './src/duel/DuelService';
+import { DuelService } from './src/duel/DuelService';
 import { DiscordService } from './src/discord/DiscordService';
-// import { DuelRepository } from './src/duel/DuelRepository';
+import { DuelRepository } from './src/duel/DuelRepository';
 import {
   duelCommand,
   storeCommand,
@@ -37,19 +37,19 @@ import {
   getInventoryButtonRows,
   inventoryEmbed,
 } from './src/inventory/InventoryEmbed';
-// import { ModalBuilder, TextInputBuilder } from '@discordjs/builders';
-// import { createWagerId, parseWagerId } from './src/wager/wagerHelper';
-// import {
-//   NOT_A_VALID_NUMBER,
-//   WAGER_PLACED,
-//   WagerService,
-// } from './src/wager/WagerService';
+import { ModalBuilder, TextInputBuilder } from '@discordjs/builders';
+import { createWagerId, parseWagerId } from './src/wager/wagerHelper';
+import {
+  NOT_A_VALID_NUMBER,
+  WAGER_PLACED,
+  WagerService,
+} from './src/wager/WagerService';
 import { WagerManager } from './src/wager/WagerManager';
 import { WagerRepository } from './src/wager/WagerRepository';
-// import { InteractionHandler } from './src/InteractionHandler';
-// import { PlayerRepository } from './src/player/PlayerRepository';
-// import { PlayerService } from './src/player/PlayerService';
-// import { DuelWinManager } from './src/duel/DuelWinManager';
+import { DuelInteractionHandler } from './src/duel/DuelInteractionHandler';
+import { PlayerRepository } from './src/player/PlayerRepository';
+import { PlayerService } from './src/player/PlayerService';
+import { DuelWinManager } from './src/duel/DuelWinManager';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -72,33 +72,33 @@ redisClient.on('connect', (stream) => {
 await redisClient.connect();
 
 //@ts-ignore
-// const goldRepository = new GoldRepository(redisClient);
-// const goldManager = new GoldManager(goldRepository);
+const goldRepository = new GoldRepository(redisClient);
+const goldManager = new GoldManager(goldRepository);
 //@ts-ignore
-// const wagerRepository = new WagerRepository(redisClient);
-// const wagerManager = new WagerManager(wagerRepository);
+const wagerRepository = new WagerRepository(redisClient);
+const wagerManager = new WagerManager(wagerRepository);
 
-// const duelRepository = new DuelRepository(redisClient);
-// const playerRepository = new PlayerRepository(redisClient);
-// const discordService = new DiscordService();
-// const playerService = new PlayerService();
-// const duelService = new DuelService();
-// const wagerService = new WagerService(goldManager, wagerManager, duelService);
+const duelRepository = new DuelRepository(redisClient);
+const playerRepository = new PlayerRepository(redisClient);
+const discordService = new DiscordService();
+const playerService = new PlayerService();
+const duelService = new DuelService();
+const wagerService = new WagerService(goldManager, wagerManager, duelService);
 
-// const duelWinManager = new DuelWinManager(
-//   duelService,
-//   wagerService,
-//   goldManager
-// );
+const duelWinManager = new DuelWinManager(
+  duelService,
+  wagerService,
+  goldManager
+);
 
-// const interactionHandler = new InteractionHandler(
-//   duelRepository,
-//   playerRepository,
-//   playerService,
-//   duelService,
-//   discordService,
-//   duelWinManager
-// );
+const dualInteractionHandler = new DuelInteractionHandler(
+  duelRepository,
+  playerRepository,
+  playerService,
+  duelService,
+  discordService,
+  duelWinManager
+);
 
 try {
   await rest.put(Routes.applicationCommands(CLIENT_ID), {
@@ -136,196 +136,152 @@ client.on('interactionCreate', async (interaction) => {
   const discordService = new DiscordService();
   if (!interaction.channelId) throw new Error('interaction.channelId is null');
 
-  // if (interaction.type === InteractionType.ModalSubmit) {
-  //   // const { action, guildId, threadId } = parseButtonId(interaction.customId);
-  //   const { threadId, playerToBetOn, action, guildId } = parseWagerId(
-  //     interaction.customId
-  //   );
+  if (interaction.type === InteractionType.ModalSubmit) {
+    // const { action, guildId, threadId } = parseButtonId(interaction.customId);
+    const { threadId, playerToBetOn, action, guildId } = parseWagerId(
+      interaction.customId
+    );
 
-  //   if (action === 'wager_modal') {
-  //     const wageredAmount =
-  //       interaction.fields.getTextInputValue('wager_amount');
+    if (action === 'wager_modal') {
+      const wageredAmount =
+        interaction.fields.getTextInputValue('wager_amount');
 
-  //     const duelThread = await discordService.findDuelThread(
-  //       interaction.guild,
-  //       interaction?.channelId
-  //     );
-  //     if (!duelThread) throw new Error('duelThread is null');
+      const duelThread = await discordService.findDuelThread(
+        interaction.guild,
+        interaction?.channelId
+      );
+      if (!duelThread) throw new Error('duelThread is null');
 
-  //     const { status } = await wagerService.createWager({
-  //       amount: wageredAmount,
-  //       threadId,
-  //       guildId,
-  //       userId: interaction.user.id,
-  //       bettingOn: playerToBetOn,
-  //     });
+      const { status } = await wagerService.createWager({
+        amount: wageredAmount,
+        threadId,
+        guildId,
+        userId: interaction.user.id,
+        bettingOn: playerToBetOn,
+      });
 
-  //     if (status === NOT_A_VALID_NUMBER) {
-  //       await interaction.reply({
-  //         content: `Bet failed. Invalid number supplied`,
-  //         ephemeral: true,
-  //       });
-  //     }
+      if (status === NOT_A_VALID_NUMBER) {
+        await interaction.reply({
+          content: `Bet failed. Invalid number supplied`,
+          ephemeral: true,
+        });
+      }
 
-  //     if (status === WAGER_PLACED) {
-  //       await interaction.reply({
-  //         content: `<@${interaction.user.id}> wagered ${wageredAmount} coins on <@${playerToBetOn}>. Good luck!`,
-  //       });
-  //     }
-  //   }
-  // }
+      if (status === WAGER_PLACED) {
+        await interaction.reply({
+          content: `<@${interaction.user.id}> wagered ${wageredAmount} coins on <@${playerToBetOn}>. Good luck!`,
+        });
+      }
+    }
+  }
 
-  // if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
-  //   if (interaction.commandName === 'buy') {
-  //     const focusedOption = interaction.options.getFocused(true);
+  if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
+    if (interaction.commandName === 'buy') {
+      const focusedOption = interaction.options.getFocused(true);
 
-  //     if (focusedOption.name === 'itemname') {
-  //       const choices = [
-  //         'Elixir of Ares',
-  //         'Cloak of Shadows',
-  //         'Ring of Fortitude',
-  //         'Sword',
-  //         'Shield',
-  //         'Armor',
-  //         'Regular Potion',
-  //       ];
-  //       const filtered = choices.filter((choice) =>
-  //         choice.startsWith(focusedOption.value)
-  //       );
-  //       await interaction.respond(
-  //         filtered.map((choice) => ({ name: choice, value: choice }))
-  //       );
-  //     }
-  //   }
-  // }
+      if (focusedOption.name === 'itemname') {
+        const choices = [
+          'Elixir of Ares',
+          'Cloak of Shadows',
+          'Ring of Fortitude',
+          'Sword',
+          'Shield',
+          'Armor',
+          'Regular Potion',
+        ];
+        const filtered = choices.filter((choice) =>
+          choice.startsWith(focusedOption.value)
+        );
+        await interaction.respond(
+          filtered.map((choice) => ({ name: choice, value: choice }))
+        );
+      }
+    }
+  }
 
-  // if (interaction.isStringSelectMenu()) {
-  //   const selectedIds = interaction.values;
-  //   const firstSelectedId = selectedIds[0];
+  if (interaction.isStringSelectMenu()) {
+    const selectedIds = interaction.values;
+    const firstSelectedId = selectedIds[0];
 
-  //   const { action } = parseButtonId(interaction.customId);
+    const { action } = parseButtonId(interaction.customId);
 
-  //   switch (action) {
-  //     case 'attack':
-  //       await interactionHandler.handleAttackTargetSelected(interaction);
-  //       break;
-  //     case 'heal':
-  //       await interactionHandler.handleHeal(interaction);
-  //       break;
-  //     case 'wager':
-  //       const whoTheyBetOn = firstSelectedId;
-  //       // Create the modal
-  //       const modal = new ModalBuilder()
-  //         .setCustomId(
-  //           createWagerId({
-  //             action: 'wager_modal',
-  //             guildId: interaction.guildId,
-  //             threadId: interaction.channelId,
-  //             playerToBetOn: whoTheyBetOn,
-  //           })
-  //         )
-  //         .setTitle('Wager');
-  //       // Add components to modal
-  //       const textInput =
-  //         new ActionRowBuilder<TextInputBuilder>().addComponents(
-  //           new TextInputBuilder()
-  //             .setCustomId('wager_amount')
-  //             .setMinLength(1)
-  //             .setStyle(TextInputStyle.Short)
-  //             .setLabel('How much do you want to wager?')
-  //         );
+    switch (action) {
+      case 'attack':
+        await dualInteractionHandler.handleAttackTargetSelected(interaction);
+        break;
+      case 'heal':
+        await dualInteractionHandler.handleHeal(interaction);
+        break;
+      case 'wager':
+        const whoTheyBetOn = firstSelectedId;
+        // Create the modal
+        const modal = new ModalBuilder()
+          .setCustomId(
+            createWagerId({
+              action: 'wager_modal',
+              guildId: interaction.guildId,
+              threadId: interaction.channelId,
+              playerToBetOn: whoTheyBetOn,
+            })
+          )
+          .setTitle('Wager');
+        // Add components to modal
+        const textInput =
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId('wager_amount')
+              .setMinLength(1)
+              .setStyle(TextInputStyle.Short)
+              .setLabel('How much do you want to wager?')
+          );
 
-  //       modal.addComponents(textInput);
-  //       // Show the modal to the user
-  //       try {
-  //         await interaction.showModal(modal);
-  //       } catch (err) {
-  //         console.error(err);
-  //       }
-  //       break;
-  //   }
-  // }
+        modal.addComponents(textInput);
+        // Show the modal to the user
+        try {
+          await interaction.showModal(modal);
+        } catch (err) {
+          console.error(err);
+        }
+        break;
+    }
+  }
 
   if (interaction.isButton()) {
-    // const { action, guildId, threadId } = parseButtonId(interaction.customId);
-    // if (action === 'wager') {
-    //   const wagerService = new WagerService(
-    //     goldManager,
-    //     wagerManager,
-    //     duelService
-    //   );
-    //   const canAcceptWagers = await wagerService.canAcceptWagers(threadId);
-    //   if (!canAcceptWagers) {
-    //     await interaction.reply({
-    //       content: 'Wagers are no longer being accepted',
-    //       ephemeral: true,
-    //     });
-    //     return;
-    //   }
-    //   const selectMenu =
-    //     new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-    //       new StringSelectMenuBuilder()
-    //         .setCustomId(
-    //           createButtonId({
-    //             action,
-    //             guildId: interaction.guildId,
-    //             threadId: interaction.channelId,
-    //             counter: 0,
-    //           })
-    //         )
-    //         .setPlaceholder('Select a duelist')
-    //         .addOptions(
-    //           playerIds.map((playerId) => {
-    //             const member = interaction.guild?.members.cache.get(playerId);
-    //             if (!member) throw new Error('member is null');
-    //             return new StringSelectMenuOptionBuilder()
-    //               .setLabel(member.displayName)
-    //               .setValue(playerId);
-    //           })
-    //         )
-    //     );
-    //   // Send the reply
-    //   await interaction.reply({
-    //     content: 'Who do you bet on?',
-    //     components: [selectMenu],
-    //     ephemeral: true,
-    //   });
-    // }
-    // if (interaction.guildId !== guildId || interaction.channelId !== threadId) {
-    //   interaction.reply({
-    //     content: 'Wrong thread',
-    //     ephemeral: true,
-    //   });
-    //   return;
-    // }
-    // switch (action) {
-    //   case 'accept': {
-    //     interactionHandler.acceptDuel(interaction);
-    //     break;
-    //   }
-    //   case 'initiative': {
-    //     interactionHandler.handleRollForInitiative(interaction);
-    //     break;
-    //   }
-    //   case 'attack':
-    //   case 'heal':
-    //     await interactionHandler.promptForTargetForHealOrAttack(interaction);
-    //     break;
-    //   case 'roll_for_damage': {
-    //     await interactionHandler.handleRollForDamage(interaction);
-    //     break;
-    //   }
-    //   case 'roll_for_damage_2x': {
-    //     await interactionHandler.handleRollForDamage(
-    //       interaction,
-    //       // critical hit
-    //       true
-    //     );
-    //     break;
-    //   }
-    //   default: {
-    //   }
-    // }
+    const { action, guildId, threadId } = parseButtonId(interaction.customId);
+    if (action === 'wager') {
+      dualInteractionHandler.handleWager(interaction);
+      return;
+    }
+    switch (action) {
+      case 'accept': {
+        dualInteractionHandler.acceptDuel(interaction);
+        break;
+      }
+      case 'initiative': {
+        dualInteractionHandler.handleRollForInitiative(interaction);
+        break;
+      }
+      case 'attack':
+      case 'heal':
+        await dualInteractionHandler.promptForTargetForHealOrAttack(
+          interaction
+        );
+        break;
+      case 'roll_for_damage': {
+        await dualInteractionHandler.handleRollForDamage(interaction);
+        break;
+      }
+      case 'roll_for_damage_2x': {
+        await dualInteractionHandler.handleRollForDamage(
+          interaction,
+          // critical hit
+          true
+        );
+        break;
+      }
+      default: {
+      }
+    }
   }
 
   if (!interaction.isChatInputCommand()) return;
@@ -405,17 +361,17 @@ client.on('interactionCreate', async (interaction) => {
       break;
     }
 
-    // case 'duel': {
-    //   await interactionHandler.handleDuel(interaction);
-    //   break;
-    // }
+    case 'duel': {
+      await dualInteractionHandler.handleDuel(interaction);
+      break;
+    }
 
     case 'gold': {
-      // const gold = await goldManager.getGold(interaction.user.id);
-      // await interaction.reply({
-      //   content: `You have ${gold} gold.`,
-      //   ephemeral: true,
-      // });
+      const gold = await goldManager.getGold(interaction.user.id);
+      await interaction.reply({
+        content: `You have ${gold} gold.`,
+        ephemeral: true,
+      });
       break;
     }
 
@@ -423,3 +379,5 @@ client.on('interactionCreate', async (interaction) => {
       break;
   }
 });
+
+client.login(TOKEN);

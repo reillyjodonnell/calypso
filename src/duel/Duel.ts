@@ -7,8 +7,10 @@ type Role = typeof CHALLENGED | typeof CHALLENGER;
 
 export class Duel {
   // key is the users id
-  private participants: Map<string, { role: Role; isReady: boolean }> =
-    new Map();
+  private participants: Map<
+    string,
+    { playerId: string; role: Role; isReady: boolean; rolledInitative: number }
+  > = new Map();
   private turnNumber = 0;
   private currentTurn = 0;
   // array of player ids
@@ -16,7 +18,7 @@ export class Duel {
 
   private skippedPlayersIds: string[] = [];
 
-  private rolledInitatives: Map<string, number> = new Map();
+  private isBettingOpen = true;
 
   constructor(private readonly id: string) {}
 
@@ -24,12 +26,11 @@ export class Duel {
     return this.participants;
   }
 
-  public getRolledInitatives() {
-    return this.rolledInitatives;
+  public getIsBettingOpen() {
+    return this.isBettingOpen;
   }
-
-  public setRolledInitiatives(rolledInitatives: Map<string, number>) {
-    this.rolledInitatives = rolledInitatives;
+  public setIsBettingOpen(isBettingOpen: boolean) {
+    this.isBettingOpen = isBettingOpen;
   }
 
   public getSkippedPlayersIds() {
@@ -48,12 +49,17 @@ export class Duel {
   }
 
   public addPlayer(playerId: string, role: Role) {
-    this.participants.set(playerId, { role, isReady: false });
+    this.participants.set(playerId, {
+      playerId,
+      role,
+      isReady: false,
+      rolledInitative: 0,
+    });
   }
 
   public hasPlayerRolledForInitiative(playerId: string) {
-    const initative = this.rolledInitatives.get(playerId);
-    return typeof initative === 'number';
+    const entry = this.participants.get(playerId);
+    return entry?.rolledInitative !== 0;
   }
 
   public hasAnyPlayerRolledForInitiative() {
@@ -61,6 +67,15 @@ export class Duel {
     return this.getPlayersIds().some((playerId) =>
       this.hasPlayerRolledForInitiative(playerId)
     );
+  }
+
+  public setPlayerInititative(playerId: string, initiative: number) {
+    const playerInfo = this.participants.get(playerId);
+    if (!playerInfo) {
+      throw new Error('Player not found');
+    }
+    playerInfo.rolledInitative = initiative;
+    this.participants.set(playerId, playerInfo);
   }
 
   public getTurnOrder() {
@@ -108,18 +123,24 @@ export class Duel {
 
   public rollForInitative(id: string, sidesOfDie: string) {
     const result = parseDieAndRoll(sidesOfDie);
-
-    this.rolledInitatives.set(id, result);
+    const player = this.participants.get(id);
+    if (!player) {
+      throw new Error('Player not found');
+    }
+    player.rolledInitative = result;
+    this.participants.set(id, player);
     return result;
   }
 
   public haveAllPlayersRolledForInitiative() {
-    return this.getPlayersIds().every((id) => this.rolledInitatives.has(id));
+    return this.getPlayersIds().every((playerId) =>
+      this.hasPlayerRolledForInitiative(playerId)
+    );
   }
   public generateTurnOrder() {
     const order = Array.from(this.participants.keys()).sort((a, b) => {
-      const initiativeA = this.rolledInitatives.get(a) || 0;
-      const initiativeB = this.rolledInitatives.get(b) || 0;
+      const initiativeA = this.participants.get(a)?.rolledInitative ?? 0;
+      const initiativeB = this.participants.get(b)?.rolledInitative ?? 0;
       return initiativeB - initiativeA;
     });
     this.setTurnOrder(order);
