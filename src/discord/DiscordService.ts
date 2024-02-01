@@ -3,14 +3,8 @@ import {
   ChatInputCommandInteraction,
   Guild,
   GuildBasedChannel,
-  Interaction,
-  NewsChannel,
-  PrivateThreadChannel,
-  PublicThreadChannel,
-  StageChannel,
   TextChannel,
   ThreadChannel,
-  VoiceChannel,
 } from 'discord.js';
 const DUEL_CHANNEL_NAME = 'duel';
 

@@ -1,8 +1,7 @@
-import { parseDieAndRoll } from '../..';
-import { Player, PlayerManager } from '../player/player';
-import { WagerService } from '../wager/WagerService';
+import { parseDieAndRoll } from '../dice/dice';
+import { Player } from '../player/player';
+import { RandomEventsGenerator } from '../randomEvents/RandomEventsGenerator';
 import { CHALLENGED, CHALLENGER, Duel } from './Duel';
-import { DuelRepository } from './DuelRepository';
 
 export const DUEL_STARTED = 'DUEL_STARTED';
 export const DUEL_NOT_FOUND = 'DUEL_NOT_FOUND';
@@ -23,6 +22,7 @@ export const NOT_PLAYERS_TURN = 'NOT_PLAYERS_TURN';
 export const TARGET_DEAD = 'TARGET_DEAD';
 export const TARGET_HIT = 'TARGET_HIT';
 export const DUEL_INVALID = 'DUEL_INVALID';
+export const ERROR_STARTING_DUEL = 'ERROR_STARTING_DUEL';
 
 export type DuelStatus =
   | typeof DUEL_STARTED
@@ -42,10 +42,6 @@ export type DuelStatus =
 
 export class DuelService {
   private counter = 0;
-  constructor(
-    private duelRepository: DuelRepository,
-    private playerManager: PlayerManager
-  ) {}
 
   public getCounter() {
     // we increment to bypass the unique id constraint on buttons
@@ -62,7 +58,11 @@ export class DuelService {
     challengerId: string;
     challengedId: string;
     duelId: string;
-  }): { status: typeof DUEL_STARTED | typeof DUEL_INVALID } {
+  }): {
+    status: typeof DUEL_STARTED | typeof DUEL_INVALID;
+    players?: Player[];
+    duel?: Duel;
+  } {
     if (challengedId === challengerId) {
       return {
         status: DUEL_INVALID,
@@ -70,26 +70,21 @@ export class DuelService {
     }
 
     const duel = new Duel(duelId);
-    const challenger = this.playerManager.addPlayer(challengerId);
-    const challenged = this.playerManager.addPlayer(challengedId);
+    const challenger = new Player(challengerId);
+    const challenged = new Player(challengedId);
 
-    duel.addPlayer(challenger, CHALLENGER);
-    duel.addPlayer(challenged, CHALLENGED);
+    duel.addPlayer(challenger.getId(), CHALLENGER);
+    duel.addPlayer(challenged.getId(), CHALLENGED);
 
-    duel.setPlayerReady(challenger);
-    this.duelRepository.save(duel);
+    duel.setPlayerReady(challenger.getId());
 
     return {
       status: DUEL_STARTED,
+      players: [challenger, challenged],
+      duel,
     };
   }
-  acceptDuel({
-    challengedId,
-    duelId,
-  }: {
-    challengedId: string;
-    duelId: string;
-  }): {
+  acceptDuel({ challengedId, duel }: { challengedId: string; duel: Duel }): {
     status:
       | typeof ALREADY_ACCEPTED_DUEL
       | typeof DUEL_NOT_FOUND
@@ -99,24 +94,12 @@ export class DuelService {
       | typeof DUEL_ACCEPTED;
     ids?: string[];
     count?: number;
-    incrementCount?: () => void;
+    duel?: Duel;
   } {
-    const duel = this.duelRepository.getById(duelId);
-    if (!duel) {
-      return {
-        status: DUEL_NOT_FOUND,
-      };
-    }
-
-    const challenged = duel.getPlayerById(challengedId);
-    if (!challenged)
-      return {
-        status: PLAYER_NOT_FOUND,
-      };
     // Validate that the player accepting the duel is the challenged player
-    const challengedRole = duel.getPlayerRole(challenged);
+    const challengedRole = duel.getPlayerRole(challengedId);
     if (!challengedRole) throw new Error('Player not found');
-    if (challengedRole.role !== CHALLENGED) {
+    if (challengedRole !== CHALLENGED) {
       return {
         status: PLAYER_NOT_CHALLENGED,
       };
@@ -128,27 +111,27 @@ export class DuelService {
         status: ALREADY_ACCEPTED_DUEL,
       };
     }
-    duel.setPlayerReady(challenged);
-    this.duelRepository.save(duel);
+    duel.setPlayerReady(challengedId);
 
     const allPlayersReady = duel.areAllPlayersReady();
     if (allPlayersReady) {
       return {
         status: ALL_PLAYERS_READY,
         ids: duel.getPlayersIds(),
-        count: this.getCounter(),
+        duel,
       };
     }
     return {
       status: DUEL_ACCEPTED,
+      duel,
     };
   }
   rollForInitiative({
-    duelId,
+    duel,
     playerId,
     sidedDie,
   }: {
-    duelId: string;
+    duel: Duel | null;
     playerId: string;
     sidedDie: string;
   }): {
@@ -160,7 +143,6 @@ export class DuelService {
     result?: number;
     playerToGoFirst?: string;
   } {
-    const duel = this.duelRepository.getById(duelId);
     if (!duel) {
       return {
         status: DUEL_NOT_FOUND,
@@ -174,14 +156,12 @@ export class DuelService {
     }
     const result = duel.rollForInitative(playerId, sidedDie);
     const allPlayersHaveRolled = duel.haveAllPlayersRolledForInitiative();
-    this.duelRepository.save(duel);
     if (allPlayersHaveRolled) {
       duel.generateTurnOrder();
-      this.duelRepository.save(duel);
       return {
         status: ALL_PLAYERS_ROLLED,
         result,
-        playerToGoFirst: duel.getCurrentTurnPlayerId().getId(),
+        playerToGoFirst: duel.getCurrentTurnPlayerId(),
       };
     }
     return {
@@ -189,51 +169,18 @@ export class DuelService {
       result,
     };
   }
-  declareAttack({ duelId, playerId }: { duelId: string; playerId: string }): {
-    status:
-      | typeof DUEL_NOT_FOUND
-      | typeof PLAYER_NOT_FOUND
-      | typeof NOT_PLAYERS_TURN
-      | 'ATTACK_DECLARED';
-    targets?: Player[];
-  } {
-    const duel = this.duelRepository.getById(duelId);
-    if (!duel) {
-      return {
-        status: DUEL_NOT_FOUND,
-      };
-    }
-    const player = duel.getPlayerById(playerId);
-    if (!player) {
-      return {
-        status: PLAYER_NOT_FOUND,
-      };
-    }
-    const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
-    if (playerId !== currentTurnPlayerId.getId()) {
-      return { status: NOT_PLAYERS_TURN };
-    }
-    this.playerManager.declareAttack(playerId);
-    this.duelRepository.save(duel);
 
-    const targets = this.playerManager.getPlayers();
-
-    return {
-      status: 'ATTACK_DECLARED',
-      targets,
-    };
-  }
-  async attemptToHit({
-    duelId,
-    attackerId,
-    defenderId,
+  attemptToHit({
+    duel,
+    attacker,
+    defender,
     sidedDie,
   }: {
-    duelId: string;
-    attackerId: string;
-    defenderId: string;
+    duel: Duel | null;
+    attacker: Player | null;
+    defender: Player | null;
     sidedDie: string | null;
-  }): Promise<{
+  }): {
     status:
       | typeof DUEL_NOT_FOUND
       | typeof PLAYER_NOT_FOUND
@@ -243,92 +190,125 @@ export class DuelService {
       | typeof CRITICAL_HIT
       | typeof CRITICAL_FAIL;
     roll?: number;
-    nextPlayer?: Player;
-    description?: string;
-    isPlayerDead?: boolean;
-  }> {
-    const duel = this.duelRepository.getById(duelId);
+    nextPlayerId?: string;
+    attacker?: Player;
+    defender?: Player;
+    duel?: Duel;
+  } {
     if (!duel) {
       return {
         status: DUEL_NOT_FOUND,
       };
     }
-    const attacker = duel.getPlayerById(attackerId);
-    if (!attacker) {
+
+    if (!defender || !attacker) {
       return {
         status: PLAYER_NOT_FOUND,
       };
     }
+
     const roll = parseDieAndRoll(sidedDie);
 
     const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
-    if (attackerId !== currentTurnPlayerId.getId()) {
+    if (attacker.getId() !== currentTurnPlayerId) {
       return { status: NOT_ATTACKERS_TURN };
     }
 
-    const defender = this.playerManager.getPlayer(defenderId);
-    if (!defender) {
-      return {
-        status: PLAYER_NOT_FOUND,
-      };
-    }
-
-    const doesHitTarget = this.playerManager.doesAttackHitPlayer(
-      defender,
-      roll
-    );
+    const doesHitTarget = roll >= defender.getAC();
 
     if (doesHitTarget) {
-      this.playerManager.setPlayerTarget(attackerId, defenderId);
-      this.duelRepository.save(duel);
+      attacker.setTargetId(defender.getId());
 
       if (roll === 20) {
         return {
           status: CRITICAL_HIT,
           roll,
+          duel,
+          attacker,
+          defender,
         };
       }
 
       return {
         status: ATTACK_HITS,
         roll,
+        duel,
+        attacker,
+        defender,
       };
     }
-    this.playerManager.clearPlayerTarget(attackerId);
+    attacker.setTargetId('');
     duel.nextTurn();
-    this.duelRepository.save(duel);
 
     if (roll === 1) {
-      // calculate random event
-      const { description, isPlayerDead } =
-        this.playerManager.executeRandomOutcome(attackerId);
-      this.duelRepository.save(duel);
       return {
-        description,
         status: CRITICAL_FAIL,
-        isPlayerDead,
         roll,
-        nextPlayer: duel.getCurrentTurnPlayerId(),
+        nextPlayerId: duel.getCurrentTurnPlayerId(),
+        duel,
+        attacker,
+        defender,
       };
     }
 
     return {
       status: ATTACK_MISSES,
       roll,
-      nextPlayer: duel.getCurrentTurnPlayerId(),
+      nextPlayerId: duel.getCurrentTurnPlayerId(),
+      duel,
+      attacker,
+      defender,
     };
   }
-  async rollFordamage({
-    duelId,
-    attackerId,
+
+  criticalFailAttack(player: Player | null) {
+    if (!player) {
+      return {
+        status: PLAYER_NOT_FOUND,
+      };
+    }
+
+    const { status, damage } = RandomEventsGenerator.emitRandomOutcome();
+    if (damage) {
+      player.hurt(damage);
+      const isPlayerDead = player.isPlayerDead();
+      return {
+        isPlayerDead,
+        damage,
+        status,
+        healthRemaining: player.getHealth(),
+      };
+    }
+    return {
+      status,
+    };
+  }
+
+  getAttackerTargetId(attacker: Player | null) {
+    if (!attacker) {
+      return {
+        status: PLAYER_NOT_FOUND,
+      };
+    }
+    return {
+      status: 'TARGET_FOUND',
+      targetId: attacker.getTargetId(),
+    };
+  }
+
+  rollFordamage({
+    duel,
+    attacker,
+    defender,
     sidedDie,
     criticalHit = false,
   }: {
-    duelId: string;
-    attackerId: string;
+    duel: Duel | null;
+    attacker: Player | null;
+    defender: Player | null;
     sidedDie: string | null;
     criticalHit: boolean;
-  }): Promise<{
+  }): {
     status:
       | typeof DUEL_NOT_FOUND
       | typeof PLAYER_NOT_FOUND
@@ -336,48 +316,38 @@ export class DuelService {
       | typeof TARGET_DEAD
       | typeof TARGET_HIT;
     targetHealthRemaining?: number;
-    targetId?: string;
-    winnerId?: string | null;
     roll?: number;
     nextPlayerId?: string;
-  }> {
-    const duel = this.duelRepository.getById(duelId);
+  } {
     if (!duel) {
       return {
         status: DUEL_NOT_FOUND,
       };
     }
-    const attacker = duel.getPlayerById(attackerId);
-    if (!attacker) {
+
+    if (!attacker || !defender) {
       return {
         status: PLAYER_NOT_FOUND,
       };
     }
+
     const roll = parseDieAndRoll(sidedDie);
     const criticalHitRoll = parseDieAndRoll(sidedDie);
 
-    const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
-    if (attackerId !== currentTurnPlayerId.getId()) {
-      return { status: NOT_ATTACKERS_TURN };
-    }
+    // attack the target
+    defender.hurt(roll + (criticalHit ? criticalHitRoll : 0));
+    const isTargetDead = defender.isPlayerDead();
+    const targetHealthRemaining = defender.getHealth();
+    attacker.clearTarget();
 
-    const { isTargetDead, targetHealthRemaining, targetId } =
-      this.playerManager.attackTarget(
-        attacker,
-        roll + (criticalHit ? criticalHitRoll : 0)
-      );
-    this.playerManager.clearPlayerTarget(attackerId);
+    // move to next turn
     duel.nextTurn();
-    const { winnerId } = this.determineWinner(duelId);
-    const nextPlayerId = duel.getCurrentTurnPlayerId().getId();
-    this.duelRepository.save(duel);
+    const nextPlayerId = duel.getCurrentTurnPlayerId();
 
     if (isTargetDead) {
       return {
         status: 'TARGET_DEAD',
         targetHealthRemaining,
-        targetId,
-        winnerId,
         roll: roll + (criticalHit ? criticalHitRoll : 0),
         nextPlayerId,
       };
@@ -386,19 +356,18 @@ export class DuelService {
     return {
       status: 'TARGET_HIT',
       targetHealthRemaining,
-      targetId,
       roll: roll + (criticalHit ? criticalHitRoll : 0),
       nextPlayerId,
     };
   }
 
   healingRoll({
-    duelId,
-    playerId,
+    duel,
+    player,
     sidedDie,
   }: {
-    duelId: string;
-    playerId: string;
+    duel: Duel | null;
+    player: Player | null;
     sidedDie: string | null;
   }): {
     status:
@@ -410,30 +379,29 @@ export class DuelService {
     healthRemaining?: number;
     roll?: number;
     nextPlayerId?: string;
+    duel?: Duel;
+    player?: Player;
   } {
-    const duel = this.duelRepository.getById(duelId);
     if (!duel) {
       return {
         status: DUEL_NOT_FOUND,
       };
     }
-    const player = duel.getPlayerById(playerId);
+
+    const roll = parseDieAndRoll(sidedDie);
+
+    const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
+    if (player?.getId() !== currentTurnPlayerId) {
+      return { status: NOT_PLAYERS_TURN };
+    }
+
     if (!player) {
       return {
         status: PLAYER_NOT_FOUND,
       };
     }
-    const roll = parseDieAndRoll(sidedDie);
-
-    const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
-    if (playerId !== currentTurnPlayerId.getId()) {
-      return { status: NOT_PLAYERS_TURN };
-    }
-
-    const { healSuccess, healthRemaining } = this.playerManager.healPlayer(
-      player,
-      roll
-    );
+    const healSuccess = player.heal(roll);
+    const healthRemaining = player.getHealth();
 
     if (!healSuccess) {
       return {
@@ -443,45 +411,34 @@ export class DuelService {
       };
     }
     duel.nextTurn();
-    const nextPlayerId = duel.getCurrentTurnPlayerId().getId();
-    this.duelRepository.save(duel);
+    const nextPlayerId = duel.getCurrentTurnPlayerId();
 
     return {
       status: 'PLAYER_HEALED',
       healthRemaining,
       roll,
       nextPlayerId,
+      duel,
+      player,
     };
   }
-  getPlayerIdsInDuel(duelId: string): string[] {
-    const duel = this.duelRepository.getById(duelId);
-    if (!duel) {
-      throw new Error('Duel not found');
-    }
-    return duel.getPlayersIds();
-  }
 
-  determineWinner(duelId: string): { winnerId: string | null } {
-    const duel = this.duelRepository.getById(duelId);
-    if (!duel) {
-      throw new Error('Duel not found');
-    }
+  determineWinner(players: Player[]): { winnerId: string | null } {
+    // Filter out players who are still alive
+    const alivePlayers = players.filter((player) => !player.isPlayerDead());
 
-    const alivePlayers = duel
-      .getPlayers()
-      .filter((player) => !this.playerManager.isPlayerDead(player));
+    // Check if exactly one player is still alive
     if (alivePlayers.length === 1) {
       return { winnerId: alivePlayers[0].getId() };
     }
 
+    // If no player or more than one player is still alive, there is no winner yet
     return { winnerId: null };
   }
-  haveAnyPlayersRolledForInitiative(duelId: string): boolean {
-    const duel = this.duelRepository.getById(duelId);
+  haveAnyPlayersRolledForInitiative(duel: Duel | null) {
     if (!duel) {
       throw new Error('Duel not found');
     }
-
     return duel.hasAnyPlayerRolledForInitiative();
   }
 }

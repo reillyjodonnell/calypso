@@ -1,4 +1,5 @@
 import { GoldManager } from '../gold/GoldManager';
+import { Player } from '../player/player';
 import { WagerService } from '../wager/WagerService';
 import { DuelService } from './DuelService';
 
@@ -11,8 +12,8 @@ export class DuelWinManager {
     private goldManager: GoldManager
   ) {}
 
-  async handleWin(duelId: string): Promise<void> {
-    const { winnerId } = this.duelService.determineWinner(duelId);
+  async handleWin(duelId: string, players: Player[]): Promise<void> {
+    const { winnerId } = this.duelService.determineWinner(players);
 
     if (winnerId) {
       // give the winner 2 gold for winning

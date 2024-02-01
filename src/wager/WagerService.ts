@@ -96,8 +96,10 @@ export class WagerService {
     return betAmount * 2;
   }
 
-  canAcceptWagers(threadId: string) {
-    // only accept if no players have rolled for inititative
-    return !this.duelService.haveAnyPlayersRolledForInitiative(threadId);
-  }
+  // async canAcceptWagers(threadId: string) {
+  //   // only accept if no players have rolled for inititative
+  //   const haveAnyPlayersRolledForInitiative =
+  //     await this.duelService.haveAnyPlayersRolledForInitiative(threadId);
+  //   return !haveAnyPlayersRolledForInitiative;
+  // }
 }
