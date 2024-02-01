@@ -598,8 +598,8 @@ export class DuelInteractionHandler {
     });
 
     try {
+      // defender doesn't get changed during attempt to hit so we just save the attacker
       await this.playerRepository.save(attacker, duelThread.id);
-      await this.playerRepository.save(defender, duelThread.id);
       await this.duelRepository.save(duel);
     } catch (err) {
       console.error(err);
@@ -767,6 +767,8 @@ export class DuelInteractionHandler {
     }
 
     const res = this.duelService.getAttackerTargetId(attacker);
+
+    console.log(res);
     if (res.status === PLAYER_NOT_FOUND || !res.targetId) {
       await interaction.reply({
         content: 'You need to select a target first!',

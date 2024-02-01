@@ -11,14 +11,19 @@ export class PlayerRepository {
 
   async save(player: Player, threadId: string) {
     const playerDTO = new PlayerDTO(player);
-    const serializedDuel = JSON.stringify(playerDTO);
-    await this.redisClient.set(`${threadId}:${player.getId()}`, serializedDuel);
+    const serializedPlayer = JSON.stringify(playerDTO);
+    await this.redisClient.set(
+      `${threadId}:${player.getId()}`,
+      serializedPlayer
+    );
   }
 
   async getById(duelId: string, playerId: string) {
-    const serializedDuel = await this.redisClient.get(`${duelId}:${playerId}`);
-    if (!serializedDuel) return null;
-    const duelDTO = JSON.parse(serializedDuel);
+    const serializedPlayer = await this.redisClient.get(
+      `${duelId}:${playerId}`
+    );
+    if (!serializedPlayer) return null;
+    const duelDTO = JSON.parse(serializedPlayer);
     return PlayerDTO.fromDTO(duelDTO);
   }
 

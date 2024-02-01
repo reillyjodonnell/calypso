@@ -56,10 +56,6 @@ export class Player {
     this.targetId = null;
   }
 
-  // New method to get the current target
-  public getTarget() {
-    return this.targetId;
-  }
   public hurt(damage: number) {
     // make sure it doesn't go below 0
     if (this.health - damage < 0) {
