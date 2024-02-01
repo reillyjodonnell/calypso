@@ -50,6 +50,9 @@ import { DuelInteractionHandler } from './src/duel/DuelInteractionHandler';
 import { PlayerRepository } from './src/player/PlayerRepository';
 import { PlayerService } from './src/player/PlayerService';
 import { DuelWinManager } from './src/duel/DuelWinManager';
+import { StoreInteractionHandler } from './src/store/StoreInteractionHandler';
+import { InventoryRepository } from './src/inventory/InventoryRepository';
+import { StoreRepository } from './src/store/StoreRepository';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -88,7 +91,8 @@ const wagerService = new WagerService(goldManager, wagerManager, duelService);
 const duelWinManager = new DuelWinManager(
   duelService,
   wagerService,
-  goldManager
+  goldManager,
+  discordService
 );
 
 const dualInteractionHandler = new DuelInteractionHandler(
@@ -98,6 +102,13 @@ const dualInteractionHandler = new DuelInteractionHandler(
   duelService,
   discordService,
   duelWinManager
+);
+const inventoryRepository = new InventoryRepository(redisClient);
+const storeRepository = new StoreRepository();
+const storeInteractionHandler = new StoreInteractionHandler(
+  goldRepository,
+  inventoryRepository,
+  storeRepository
 );
 
 try {
@@ -279,6 +290,39 @@ client.on('interactionCreate', async (interaction) => {
         );
         break;
       }
+    }
+    const storeAction = interaction.customId;
+    console.log(storeAction);
+    switch (storeAction) {
+      // STORE
+      case 'buy_1': {
+        await storeInteractionHandler.handleStorePurchase(interaction, '1');
+        break;
+      }
+      case 'buy_2': {
+        await storeInteractionHandler.handleStorePurchase(interaction, '2');
+        break;
+      }
+      case 'buy_3': {
+        await storeInteractionHandler.handleStorePurchase(interaction, '3');
+        break;
+      }
+      case 'buy_4': {
+        await storeInteractionHandler.handleStorePurchase(interaction, '4');
+        break;
+      }
+      case 'buy_5': {
+        await storeInteractionHandler.handleStorePurchase(interaction, '5');
+        break;
+      }
+      case 'buy_6': {
+        await storeInteractionHandler.handleStorePurchase(interaction, '6');
+        break;
+      }
+      case 'buy_7': {
+        await storeInteractionHandler.handleStorePurchase(interaction, '7');
+        break;
+      }
       default: {
       }
     }
@@ -291,6 +335,7 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.reply({
         embeds: [storeEmbed],
         components: [...(getButtonRows() as any)],
+        ephemeral: true,
       });
       break;
     }

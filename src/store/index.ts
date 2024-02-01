@@ -10,21 +10,21 @@ const featuredItems = [
   {
     name: 'Elixir of Ares',
     emoji: '🔮',
-    id: 'elixir_of_ares',
+    id: '1',
     description: 'Heals 2d4 health points.',
     price: '100 gold',
   },
   {
     name: 'Cloak of Shadows',
     emoji: '🌫️',
-    id: 'cloak_of_shadows',
+    id: '2',
     description: 'Grants temporary invisibility.',
     price: '150 gold',
   },
   {
     name: 'Ring of Fortitude',
     emoji: '💍',
-    id: 'ring_of_fortitude',
+    id: '3',
     description: '+2ac against first attack.',
     price: '120 gold',
   },
@@ -33,28 +33,28 @@ const standardItems = [
   {
     name: 'Sword',
     emoji: '⚔️',
-    id: 'sword',
+    id: '4',
     description: '1d6 attack',
     price: '50 gold',
   },
   {
     name: 'Warhammer',
     emoji: '🔨',
-    id: 'warhammer',
+    id: '5',
     description: '1d8 attack',
     price: '70 gold',
   },
   {
     name: 'Bow',
     emoji: '🏹',
-    id: 'bow',
+    id: '6',
     description: '2d4 attack',
     price: '60 gold',
   },
   {
     name: 'Staff',
     emoji: '🔱',
-    id: 'staff',
+    id: '7',
     description: '1d6 attack',
     price: '50 gold',
   },
@@ -87,12 +87,13 @@ export const storeEmbed = new EmbedBuilder()
   )
   .setFooter({ text: 'Use /buy [item_name] to purchase an item.' });
 
-const buttons = [...featuredItems, ...standardItems].map((item) =>
-  new ButtonBuilder()
+const buttons = [...featuredItems, ...standardItems].map((item) => {
+  console.log(item.id);
+  return new ButtonBuilder()
     .setCustomId(`buy_${item.id}`)
     .setLabel(`${item.emoji} Buy ${item.name}`)
-    .setStyle(ButtonStyle.Primary)
-);
+    .setStyle(ButtonStyle.Primary);
+});
 
 export function getButtonRows() {
   // Organize buttons into rows (max 5 buttons per row)

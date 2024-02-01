@@ -65,21 +65,43 @@ export class WagerService {
     };
   }
 
-  public async settleWagers(
-    threadId: string,
-    winningPlayerId: string
-  ): Promise<void> {
+  public async getWagers(threadId: string) {
     const wagers = await this.wagerManager.getWagers(threadId);
+    return wagers;
+  }
 
+  public async settleWagers({
+    threadId,
+    winnerId,
+  }: {
+    threadId: string;
+    winnerId: string;
+  }): Promise<SettledWager[]> {
+    const wagers = await this.wagerManager.getWagers(threadId);
+    console.log(wagers);
+    const settled: SettledWager[] = [];
     for (const wager of wagers) {
-      if (wager.betOnPlayerId === winningPlayerId) {
+      if (wager.betOnPlayerId === winnerId) {
         // Calculate payout amount (this could be the same as the wager, double, etc.)
         const payoutAmount = this.calculatePayout(wager.amount);
-
+        settled.push({
+          amountWagered: wager.amount,
+          winnings: payoutAmount,
+          betOnPlayerId: wager.betOnPlayerId,
+          playerId: wager.playerId,
+        });
         // Award gold to the winning player
         await this.goldManager.awardGold(wager.playerId, payoutAmount);
+        continue;
       }
+      settled.push({
+        amountWagered: wager.amount,
+        winnings: 0,
+        betOnPlayerId: wager.betOnPlayerId,
+        playerId: wager.playerId,
+      });
     }
+    return settled;
 
     // Additional logic as needed, e.g., handling losing wagers
   }
@@ -96,3 +118,10 @@ export class WagerService {
     return betAmount * 2;
   }
 }
+
+export type SettledWager = {
+  amountWagered: number;
+  winnings: number;
+  betOnPlayerId: string;
+  playerId: string;
+};

@@ -650,21 +650,20 @@ export class DuelInteractionHandler {
 
       if (isPlayerDead) {
         const description = `You swing at your target, but miss and hit yourself for ${damage} damage! You have died!`;
-        this.duelWinManager.handleWin(interaction.channelId, [
-          attacker,
-          defender,
-        ]);
+        const wagerResults = await this.duelWinManager.handleWin(
+          interaction.channelId,
+          [attacker, defender]
+        );
         // end game
         await interaction.reply({
           content: `${description}\n\n<@${nextPlayerId}> wins!`,
           components: [row as any],
         });
+        if (wagerResults) {
+          await interaction.followUp({ embeds: [wagerResults] });
+        }
         await duelThread.setLocked(true);
         if (!nextPlayerId) throw new Error('nextPlayer id is null');
-        this.duelWinManager.handleWin(interaction.channelId, [
-          attacker,
-          defender,
-        ]);
       }
 
       switch (status) {
@@ -866,10 +865,14 @@ export class DuelInteractionHandler {
       );
       // lock the thread bc the game is over
       await duelThread.setLocked(true);
-      this.duelWinManager.handleWin(interaction.channelId, [
-        attacker,
-        defender,
-      ]);
+      const wagerResults = await this.duelWinManager.handleWin(
+        interaction.channelId,
+        [attacker, defender]
+      );
+      if (wagerResults) {
+        await interaction.followUp({ embeds: [wagerResults] });
+      }
+      // create a
       return;
     }
   }
@@ -910,6 +913,32 @@ export class DuelInteractionHandler {
     }
     const { action, guildId, threadId } = parseButtonId(interaction.customId);
 
+    const options = await Promise.all(
+      playerIds.map(async (id) => {
+        let targetMember = interaction?.guild?.members.cache.get(id);
+        if (!targetMember) {
+          try {
+            targetMember = await interaction?.guild?.members.fetch(id);
+          } catch (error) {
+            console.error(`Error fetching member with ID ${id}: ${error}`);
+            return null;
+          }
+        }
+
+        if (!targetMember) {
+          console.error(`Member with ID ${id} not found.`);
+          return null;
+        }
+
+        const displayName = targetMember.displayName;
+        if (!displayName) throw new Error('displayName is null');
+
+        return new StringSelectMenuOptionBuilder()
+          .setLabel(displayName)
+          .setValue(id);
+      })
+    );
+
     const selectMenu =
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
         new StringSelectMenuBuilder()
@@ -922,15 +951,7 @@ export class DuelInteractionHandler {
             })
           )
           .setPlaceholder('Select a duelist')
-          .addOptions(
-            playerIds.map((playerId) => {
-              const member = interaction.guild?.members.cache.get(playerId);
-              if (!member) throw new Error('member is null');
-              return new StringSelectMenuOptionBuilder()
-                .setLabel(member.displayName)
-                .setValue(playerId);
-            })
-          )
+          .addOptions(options as StringSelectMenuOptionBuilder[])
       );
     // Send the reply
     await interaction.reply({
