@@ -209,8 +209,7 @@ export class DuelService {
       };
     }
 
-    // const roll = parseDieAndRoll(sidedDie);
-    const roll: number = 20;
+    const roll = parseDieAndRoll(sidedDie);
 
     const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
     if (attacker.getId() !== currentTurnPlayerId) {
