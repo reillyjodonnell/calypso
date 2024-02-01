@@ -15,7 +15,7 @@ export class PlayerDTO {
     this.maxHealth = player.getMaxHealth();
     this.numberOfHeals = player.getNumberOfHeals();
     this.healsUsed = player.getHealsUsed();
-    this.targetId = player.getTarget();
+    this.targetId = player.getTargetId();
   }
 
   // Optionally, add a method to convert back to a Player instance
