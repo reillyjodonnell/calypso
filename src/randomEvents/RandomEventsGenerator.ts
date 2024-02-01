@@ -20,24 +20,10 @@ export class RandomEventsGenerator {
           damage,
         };
 
-      // player.hurt(damage);
-      // // Apply self-harm logic, like reducing player's health
-      // const isPlayerDead = player.isPlayerDead();
-      // return {
-      //   isPlayerDead,
-      //   description: `You swing at your target, but miss and hit yourself for ${damage} damage! ${
-      //     isPlayerDead
-      //       ? 'You have died!'
-      //       : `You have ${player.getHealth()} health remaining.`
-      //   }`,
-      // };
       case NO_EFFECT:
         return {
           status: NO_EFFECT,
         };
-      // return {
-      //   description: `You swing at your target and miss terribly. Somehow you recovered!`,
-      // };
 
       default:
         throw new Error('Invalid outcome');
