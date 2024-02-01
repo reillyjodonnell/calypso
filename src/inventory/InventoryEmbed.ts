@@ -18,6 +18,7 @@ const userInventory: InventoryItem[] = [
     emoji: '🔨',
     id: 'iron_warhammer',
     description: '1d10 attack, heavy',
+    active: true,
   },
   // ... other inventory items
 ];
@@ -27,6 +28,7 @@ interface InventoryItem {
   emoji: string;
   id: string;
   description: string;
+  active?: boolean;
 }
 
 export const inventoryEmbed = new EmbedBuilder()
@@ -44,8 +46,8 @@ export const inventoryEmbed = new EmbedBuilder()
 const inventoryButtons = userInventory.map((item) =>
   new ButtonBuilder()
     .setCustomId(`use_${item.id}`)
-    .setLabel(`${item.emoji} Use ${item.name}`)
-    .setStyle(ButtonStyle.Primary)
+    .setLabel(`${item.emoji} ${item.active ? 'Unequip' : 'Equip'} ${item.name}`)
+    .setStyle(item.active ? ButtonStyle.Secondary : ButtonStyle.Primary)
 );
 
 export function getInventoryButtonRows() {

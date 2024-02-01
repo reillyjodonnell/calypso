@@ -7,5 +7,5 @@ export function playersTurnResponse({
   health: number;
   maxHealth: number;
 }) {
-  return `<@${id}> it's your turn! Use /attack to begin the attack.\n\n\`You have ${health}/${maxHealth} health.\``;
+  return `<@${id}> it's your turn!\n\n\`You have ${health}/${maxHealth} health.\``;
 }

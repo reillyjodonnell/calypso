@@ -31,5 +31,9 @@ export class WagerRepository implements WagerRepositoryInterface {
     return wagersSerialized.map((wagerStr) => JSON.parse(wagerStr));
   }
 
+  async clearWager(threadId: string) {
+    await this.redisClient.del(`wagers:${threadId}`);
+  }
+
   // Additional methods as needed
 }

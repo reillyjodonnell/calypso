@@ -7,27 +7,44 @@ export interface GoldRepositoryInterface {
 }
 
 export class GoldRepository implements GoldRepositoryInterface {
-  private redisClient: RedisClientType;
-
-  constructor(redisClient: RedisClientType) {
-    this.redisClient = redisClient;
-  }
+  constructor(private redisClient: RedisClientType) {}
 
   async awardGold(playerId: string, amount: number): Promise<void> {
-    await this.redisClient.hIncrBy('user:' + playerId, 'gold', amount);
+    await this.redisClient.incrBy(`user:${playerId}:gold`, amount);
   }
 
   async spendGold(playerId: string, amount: number): Promise<boolean> {
+    // Start a watch on the gold key
+    await this.redisClient.watch(`user:${playerId}:gold`);
+
+    // Get the current gold value
     const currentGold = await this.getGold(playerId);
+
     if (amount > currentGold) {
+      // If not enough gold, cancel the transaction
+      await this.redisClient.unwatch();
       return false;
     }
-    await this.redisClient.hIncrBy('user:' + playerId, 'gold', -amount);
-    return true;
+
+    // If enough gold, proceed with the transaction
+    const result = await this.redisClient
+      .multi()
+      .decrBy(`user:${playerId}:gold`, amount)
+      .exec();
+
+    // If the transaction failed (e.g., key was modified by another client), result will be null
+    return result !== null;
   }
 
   async getGold(playerId: string): Promise<number> {
-    const gold = await this.redisClient.hGet('user:' + playerId, 'gold');
-    return parseInt(gold ?? '0', 10);
+    let gold = await this.redisClient.get(`user:${playerId}:gold`);
+
+    if (gold === null) {
+      // Set the default value if it does not exist
+      await this.redisClient.set(`user:${playerId}:gold`, '0');
+      gold = '0';
+    }
+
+    return parseInt(gold);
   }
 }

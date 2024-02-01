@@ -1,17 +1,13 @@
 import {
   ChannelType,
   ChatInputCommandInteraction,
+  EmbedBuilder,
   Guild,
   GuildBasedChannel,
-  Interaction,
-  NewsChannel,
-  PrivateThreadChannel,
-  PublicThreadChannel,
-  StageChannel,
   TextChannel,
   ThreadChannel,
-  VoiceChannel,
 } from 'discord.js';
+import { SettledWager } from '../wager/WagerService';
 const DUEL_CHANNEL_NAME = 'duel';
 
 export class DiscordService {
@@ -58,8 +54,6 @@ export class DiscordService {
       autoArchiveDuration: 60, // Adjust as needed
       reason: 'Creating a new thread for a duel',
     });
-
-    duelThread.id;
 
     return duelThread;
   }
@@ -146,5 +140,34 @@ export class DiscordService {
       reason: 'Needed a channel for duels',
     });
     return newDuelChannel;
+  }
+
+  showWagerResults(settledWagers: SettledWager[], winningPlayerId: string) {
+    // Create an embed
+    const betResultsEmbed = new EmbedBuilder()
+      .setColor('#0099ff')
+      .setTitle('Bet Results')
+      .setDescription(
+        `Results for bets on the winning player: <@${winningPlayerId}>`
+      );
+
+    // Add fields for each winning bet
+    betResultsEmbed.addFields(
+      settledWagers.map(
+        ({ amountWagered, betOnPlayerId, playerId, winnings }, index) => {
+          const winStatement = `<@${playerId}> bet on <@${betOnPlayerId}> and won ${winnings} gold!`;
+          const loseStatement = `<@${playerId}> bet on <@${betOnPlayerId}> and lost ${amountWagered} gold.`;
+
+          return {
+            name: `Bet ${index + 1}`,
+            value:
+              winningPlayerId === betOnPlayerId ? winStatement : loseStatement,
+            inline: true,
+          };
+        }
+      )
+    );
+
+    return betResultsEmbed;
   }
 }
