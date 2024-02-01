@@ -6,8 +6,6 @@ import {
   EmbedBuilder,
   InteractionType,
   ActionRowBuilder,
-  StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
   TextInputStyle,
 } from 'discord.js';
 import { DuelService } from './src/duel/DuelService';
@@ -27,7 +25,7 @@ import {
   goldCommand,
   inventoryCommand,
 } from './src/commands';
-import { createButtonId, parseButtonId } from './src/buttons';
+import { parseButtonId } from './src/buttons';
 import { getButtonRows, storeEmbed } from './src/store';
 import { createClient } from 'redis';
 import { GoldRepository } from './src/gold/GoldRepository';
@@ -53,6 +51,7 @@ import { DuelWinManager } from './src/duel/DuelWinManager';
 import { StoreInteractionHandler } from './src/store/StoreInteractionHandler';
 import { InventoryRepository } from './src/inventory/InventoryRepository';
 import { StoreRepository } from './src/store/StoreRepository';
+import { DuelCleanup } from './src/duel/DuelCleanup';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -74,6 +73,8 @@ redisClient.on('connect', (stream) => {
 });
 await redisClient.connect();
 
+// Repositories
+
 //@ts-ignore
 const goldRepository = new GoldRepository(redisClient);
 const goldManager = new GoldManager(goldRepository);
@@ -83,6 +84,14 @@ const wagerManager = new WagerManager(wagerRepository);
 
 const duelRepository = new DuelRepository(redisClient);
 const playerRepository = new PlayerRepository(redisClient);
+
+// Clean up
+const duelCleanup = new DuelCleanup(
+  wagerRepository,
+  duelRepository,
+  playerRepository
+);
+
 const discordService = new DiscordService();
 const playerService = new PlayerService();
 const duelService = new DuelService();
@@ -101,7 +110,8 @@ const dualInteractionHandler = new DuelInteractionHandler(
   playerService,
   duelService,
   discordService,
-  duelWinManager
+  duelWinManager,
+  duelCleanup
 );
 const inventoryRepository = new InventoryRepository(redisClient);
 const storeRepository = new StoreRepository();
@@ -292,7 +302,6 @@ client.on('interactionCreate', async (interaction) => {
       }
     }
     const storeAction = interaction.customId;
-    console.log(storeAction);
     switch (storeAction) {
       // STORE
       case 'buy_1': {

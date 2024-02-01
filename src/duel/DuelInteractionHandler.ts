@@ -47,6 +47,7 @@ import {
   SELF_HARM,
 } from '../randomEvents/RandomEventsGenerator';
 import { WagerService } from '../wager/WagerService';
+import { DuelCleanup } from './DuelCleanup';
 
 const DEFAULT_DIE = 'd20';
 const DEFAULT_HEAL_DIE = 'd4';
@@ -59,7 +60,8 @@ export class DuelInteractionHandler {
     private playerService: PlayerService,
     private duelService: DuelService,
     private discordService: DiscordService,
-    private duelWinManager: DuelWinManager
+    private duelWinManager: DuelWinManager,
+    private duelCleanup: DuelCleanup
   ) {}
 
   async handleDuel(interaction: ChatInputCommandInteraction<CacheType>) {
@@ -663,6 +665,7 @@ export class DuelInteractionHandler {
           await interaction.followUp({ embeds: [wagerResults] });
         }
         await duelThread.setLocked(true);
+        await this.duelCleanup.remove(duelThread.id, duel);
         if (!nextPlayerId) throw new Error('nextPlayer id is null');
       }
 
@@ -872,6 +875,7 @@ export class DuelInteractionHandler {
       if (wagerResults) {
         await interaction.followUp({ embeds: [wagerResults] });
       }
+      await this.duelCleanup.remove(duelThread.id, duel);
       // create a
       return;
     }

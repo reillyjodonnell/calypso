@@ -2,7 +2,7 @@ import { EmbedBuilder } from '@discordjs/builders';
 import { DiscordService } from '../discord/DiscordService';
 import { GoldManager } from '../gold/GoldManager';
 import { Player } from '../player/player';
-import { SettledWager, WagerService } from '../wager/WagerService';
+import { WagerService } from '../wager/WagerService';
 import { DuelService } from './DuelService';
 
 const GOLD_AMOUNT_FOR_WIN = 5;

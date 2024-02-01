@@ -22,7 +22,7 @@ export class PlayerRepository {
     return PlayerDTO.fromDTO(duelDTO);
   }
 
-  async deleteDuel(duelId: string) {
-    await this.redisClient.del(`player:${duelId}`);
+  async delete(duelId: string, playerId: string) {
+    await this.redisClient.del(`${duelId}:${playerId}`);
   }
 }
