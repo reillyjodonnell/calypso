@@ -1,69 +1,29 @@
-type Item = {
-  name: string;
-  emoji: string;
-  id: string;
-  description: string;
-  price: string;
-};
+import { simpleWeapons } from '../item/PretendDBForItems';
+import { WeaponDTO } from '../item/WeaponDTO';
+import { Weapon } from '../item/weapon';
 
 export class StoreRepository {
-  async getItems(): Promise<Item[]> {
+  async getItems(): Promise<Weapon[]> {
     return new Promise((resolve, _) => {
-      resolve([...featuredItems, ...standardItems]);
+      // loop and create WeaponDTO for each
+      const items = simpleWeapons.map((weapon) => {
+        // by default all weapons are unequipped
+        const weaponDTO = WeaponDTO.fromDTO({ ...weapon, equipped: false });
+        return weaponDTO;
+      });
+      resolve(items);
+    });
+  }
+
+  async getItem(itemId: string): Promise<Weapon | null> {
+    return new Promise((resolve, _) => {
+      const item = simpleWeapons.find((weapon) => weapon.id === itemId);
+      if (item) {
+        const weaponDTO = WeaponDTO.fromDTO({ ...item, equipped: false });
+        resolve(weaponDTO);
+      } else {
+        resolve(null);
+      }
     });
   }
 }
-
-const featuredItems = [
-  {
-    name: 'Elixir of Ares',
-    emoji: '🔮',
-    id: '1',
-    description: 'Heals 2d4 health points.',
-    price: '100 gold',
-  },
-  {
-    name: 'Cloak of Shadows',
-    emoji: '🌫️',
-    id: '2',
-    description: 'Grants temporary invisibility.',
-    price: '150 gold',
-  },
-  {
-    name: 'Ring of Fortitude',
-    emoji: '💍',
-    id: '3',
-    description: '+2ac against first attack.',
-    price: '120 gold',
-  },
-];
-const standardItems = [
-  {
-    name: 'Sword',
-    emoji: '⚔️',
-    id: '4',
-    description: '1d6 attack',
-    price: '50 gold',
-  },
-  {
-    name: 'Warhammer',
-    emoji: '🔨',
-    id: '5',
-    description: '1d8 attack',
-    price: '70 gold',
-  },
-  {
-    name: 'Bow',
-    emoji: '🏹',
-    id: '6',
-    description: '2d4 attack',
-    price: '60 gold',
-  },
-  {
-    name: 'Staff',
-    emoji: '🔱',
-    id: '7',
-    description: '1d6 attack',
-    price: '50 gold',
-  },
-];

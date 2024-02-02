@@ -1,4 +1,5 @@
 import { parseDieAndRoll } from '../dice/dice';
+import { Weapon } from '../item/weapon';
 import { Player } from '../player/player';
 import { RandomEventsGenerator } from '../randomEvents/RandomEventsGenerator';
 import { CHALLENGED, CHALLENGER, Duel } from './Duel';
@@ -54,10 +55,14 @@ export class DuelService {
     challengerId,
     challengedId,
     duelId,
+    challengerWeapon,
+    challengedWeapon,
   }: {
     challengerId: string;
     challengedId: string;
     duelId: string;
+    challengerWeapon: Weapon;
+    challengedWeapon: Weapon;
   }): {
     status: typeof DUEL_STARTED | typeof DUEL_INVALID;
     players?: Player[];
@@ -71,7 +76,15 @@ export class DuelService {
 
     const duel = new Duel(duelId);
     const challenger = new Player(challengerId);
+    challenger.setCriticalFail(challengerWeapon.getCritFail());
+    challenger.setCriticalHit(challengerWeapon.getCritHit());
+    challenger.setDamage(challengerWeapon.getDamage());
+    challenger.setRollToHit(challengerWeapon.getRollToHit());
     const challenged = new Player(challengedId);
+    challenged.setCriticalFail(challengedWeapon.getCritFail());
+    challenged.setCriticalHit(challengedWeapon.getCritHit());
+    challenged.setDamage(challengedWeapon.getDamage());
+    challenged.setRollToHit(challengedWeapon.getRollToHit());
 
     duel.addPlayer(challenger.getId(), CHALLENGER);
     duel.addPlayer(challenged.getId(), CHALLENGED);
@@ -209,6 +222,7 @@ export class DuelService {
       };
     }
 
+    console.log(sidedDie, 'sidedDie');
     const roll = parseDieAndRoll(sidedDie);
 
     const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
@@ -221,7 +235,7 @@ export class DuelService {
     if (doesHitTarget) {
       attacker.setTargetId(defender.getId());
 
-      if (roll === 20) {
+      if (attacker.getCriticalHit().includes(roll)) {
         return {
           status: CRITICAL_HIT,
           roll,
@@ -242,7 +256,7 @@ export class DuelService {
     attacker.setTargetId('');
     duel.nextTurn();
 
-    if (roll === 1) {
+    if (attacker.getCriticalFail().includes(roll)) {
       return {
         status: CRITICAL_FAIL,
         roll,

@@ -46,12 +46,8 @@ import {
   NO_EFFECT,
   SELF_HARM,
 } from '../randomEvents/RandomEventsGenerator';
-import { WagerService } from '../wager/WagerService';
 import { DuelCleanup } from './DuelCleanup';
-
-const DEFAULT_DIE = 'd20';
-const DEFAULT_HEAL_DIE = 'd4';
-const DEFAULT_DAMAGE_DIE = 'd6';
+import { InventoryRepository } from '../inventory/InventoryRepository';
 
 export class DuelInteractionHandler {
   constructor(
@@ -61,7 +57,8 @@ export class DuelInteractionHandler {
     private duelService: DuelService,
     private discordService: DiscordService,
     private duelWinManager: DuelWinManager,
-    private duelCleanup: DuelCleanup
+    private duelCleanup: DuelCleanup,
+    private inventoryRepository: InventoryRepository
   ) {}
 
   async handleDuel(interaction: ChatInputCommandInteraction<CacheType>) {
@@ -73,10 +70,28 @@ export class DuelInteractionHandler {
       guild: interaction.guild,
     });
 
+    // for both we need to get their weapons, find which is equipped, then pass it
+    const challengerWeapon = await this.inventoryRepository.getActiveWeapon(
+      challengerId
+    );
+    const challengedWeapon = await this.inventoryRepository.getActiveWeapon(
+      user.id
+    );
+
+    if (!challengerWeapon || !challengedWeapon) {
+      await interaction.reply({
+        content: 'You or your opponent do not have a weapon equipped!',
+        ephemeral: true,
+      });
+      return;
+    }
+
     const { status, players, duel } = this.duelService.challengePlayer({
       challengedId: user.id,
       challengerId,
       duelId: duelThread.id,
+      challengerWeapon,
+      challengedWeapon,
     });
 
     try {
@@ -469,7 +484,7 @@ export class DuelInteractionHandler {
   }
 
   async handleHeal(interaction: StringSelectMenuInteraction<CacheType>) {
-    const defaultHealDie = 'd4';
+    const defaultHealDie = '1d4';
     const discordService = new DiscordService();
     const duelThread = await discordService.findDuelThread(
       interaction.guild,
@@ -507,8 +522,6 @@ export class DuelInteractionHandler {
       sidedDie: defaultHealDie,
     });
     if (status === 'NOT_PLAYERS_TURN') {
-      console.log('helaing roll');
-
       await interaction.reply({
         content: "It's not your turn!",
         ephemeral: true,
@@ -590,11 +603,12 @@ export class DuelInteractionHandler {
       });
       return;
     }
+
     const { roll, status, nextPlayerId } = this.duelService.attemptToHit({
       duel,
       attacker,
       defender,
-      sidedDie: DEFAULT_DIE,
+      sidedDie: attacker.getRollToHit(),
     });
 
     try {
@@ -606,7 +620,6 @@ export class DuelInteractionHandler {
     }
 
     if (status === 'NOT_ATTACKERS_TURN') {
-      console.log('NOT ATTACKERS TURN STATUS');
       await interaction.reply("It's not your turn!");
       return;
     }
@@ -768,7 +781,6 @@ export class DuelInteractionHandler {
 
     const res = this.duelService.getAttackerTargetId(attacker);
 
-    console.log(res);
     if (res.status === PLAYER_NOT_FOUND || !res.targetId) {
       await interaction.reply({
         content: 'You need to select a target first!',
@@ -808,7 +820,7 @@ export class DuelInteractionHandler {
       duel,
       attacker,
       defender,
-      sidedDie: DEFAULT_DAMAGE_DIE,
+      sidedDie: attacker.getDamage(),
       criticalHit,
     });
 
@@ -819,7 +831,6 @@ export class DuelInteractionHandler {
     const { winnerId } = this.duelService.determineWinner([attacker, defender]);
 
     if (status === 'NOT_ATTACKERS_TURN') {
-      console.log('NOT ATTACKERS TURN STATUS');
       await interaction.reply("It's not your turn!");
       return;
     }

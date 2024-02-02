@@ -143,6 +143,7 @@ export class DiscordService {
   }
 
   showWagerResults(settledWagers: SettledWager[], winningPlayerId: string) {
+    if (settledWagers.length === 0) return null;
     // Create an embed
     const betResultsEmbed = new EmbedBuilder()
       .setColor('#0099ff')

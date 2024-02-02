@@ -18,10 +18,9 @@ export class DuelWinManager {
   async handleWin(
     duelId: string,
     players: Player[]
-  ): Promise<void | EmbedBuilder> {
+  ): Promise<null | EmbedBuilder> {
     try {
       const { winnerId } = this.duelService.determineWinner(players);
-      console.log(`Winner is ${winnerId}. Thread id: ${duelId}`);
       if (winnerId) {
         // give the winner 2 gold for winning
         await this.goldManager.awardGold(winnerId, GOLD_AMOUNT_FOR_WIN);
@@ -38,8 +37,10 @@ export class DuelWinManager {
 
         return wagerResultsEmbed;
       }
+      return null;
     } catch (error) {
       console.error(`Error handling wager payout: ${error}`);
+      return null;
     }
 
     // Add any additional logic for cases where there's no clear winner

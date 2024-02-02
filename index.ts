@@ -7,6 +7,7 @@ import {
   InteractionType,
   ActionRowBuilder,
   TextInputStyle,
+  APIEmbed,
 } from 'discord.js';
 import { DuelService } from './src/duel/DuelService';
 import { DiscordService } from './src/discord/DiscordService';
@@ -24,17 +25,14 @@ import {
   testCommand,
   goldCommand,
   inventoryCommand,
+  initCommand,
 } from './src/commands';
 import { parseButtonId } from './src/buttons';
-import { getButtonRows, storeEmbed } from './src/store';
+import { createStoreEmbed } from './src/store';
 import { createClient } from 'redis';
 import { GoldRepository } from './src/gold/GoldRepository';
 import { RedisClientType } from '@redis/client';
 import { GoldManager } from './src/gold/GoldManager';
-import {
-  getInventoryButtonRows,
-  inventoryEmbed,
-} from './src/inventory/InventoryEmbed';
 import { ModalBuilder, TextInputBuilder } from '@discordjs/builders';
 import { createWagerId, parseWagerId } from './src/wager/wagerHelper';
 import {
@@ -52,6 +50,13 @@ import { StoreInteractionHandler } from './src/store/StoreInteractionHandler';
 import { InventoryRepository } from './src/inventory/InventoryRepository';
 import { StoreRepository } from './src/store/StoreRepository';
 import { DuelCleanup } from './src/duel/DuelCleanup';
+import {
+  createInventoryEmbed,
+  parseInventoryButtonId,
+} from './src/inventory/InventoryEmbed';
+import { Weapon } from './src/item/weapon';
+import { UserService } from './src/user/UserService';
+import { InventoryService } from './src/inventory/InventoryService';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -103,6 +108,7 @@ const duelWinManager = new DuelWinManager(
   goldManager,
   discordService
 );
+const inventoryRepository = new InventoryRepository(redisClient);
 
 const dualInteractionHandler = new DuelInteractionHandler(
   duelRepository,
@@ -111,15 +117,18 @@ const dualInteractionHandler = new DuelInteractionHandler(
   duelService,
   discordService,
   duelWinManager,
-  duelCleanup
+  duelCleanup,
+  inventoryRepository
 );
-const inventoryRepository = new InventoryRepository(redisClient);
 const storeRepository = new StoreRepository();
 const storeInteractionHandler = new StoreInteractionHandler(
   goldRepository,
   inventoryRepository,
   storeRepository
 );
+
+const userService = new UserService(inventoryRepository, storeRepository);
+const inventoryService = new InventoryService(inventoryRepository);
 
 try {
   await rest.put(Routes.applicationCommands(CLIENT_ID), {
@@ -136,6 +145,7 @@ try {
       testCommand,
       goldCommand,
       inventoryCommand,
+      initCommand,
     ],
   });
 } catch (error) {
@@ -151,6 +161,11 @@ client.on('ready', () => {
 
 client.on('error', (err) => {
   console.error('client error', err);
+});
+
+client.on('guildMemberAdd', async (member) => {
+  const userId = member.id;
+  await userService.initializeUser(userId);
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -302,6 +317,35 @@ client.on('interactionCreate', async (interaction) => {
       }
     }
     const storeAction = interaction.customId;
+    console.log('store action:', storeAction);
+    // inventory
+    if (storeAction.startsWith('use')) {
+      const { action, itemId, playerId } = parseInventoryButtonId(storeAction);
+      const item = await inventoryRepository.getItem(playerId, itemId);
+      if (!item) {
+        await interaction.reply({
+          content: 'Item not found.',
+          ephemeral: true,
+        });
+        return;
+      }
+      const weapons = await inventoryRepository.getItems(playerId);
+      if (!weapons) {
+        await interaction.reply({
+          content: 'No weapons found.',
+          ephemeral: true,
+        });
+        return;
+      }
+      if (item instanceof Weapon) {
+        inventoryService.equipWeapon({ weapons, playerId, weaponId: itemId });
+        interaction.reply({
+          content: `You've equipped the ${item.getName()}`,
+          ephemeral: true,
+        });
+      }
+    }
+
     switch (storeAction) {
       // STORE
       case 'buy_1': {
@@ -332,8 +376,8 @@ client.on('interactionCreate', async (interaction) => {
         await storeInteractionHandler.handleStorePurchase(interaction, '7');
         break;
       }
-      default: {
-      }
+
+      // equipment
     }
   }
 
@@ -341,20 +385,46 @@ client.on('interactionCreate', async (interaction) => {
 
   switch (interaction.commandName) {
     case 'store': {
+      const weapons = await storeRepository.getItems();
+      const { components, embed } = createStoreEmbed(weapons);
       await interaction.reply({
-        embeds: [storeEmbed],
-        components: [...(getButtonRows() as any)],
+        embeds: [embed],
+        components: [...(components as any)],
         ephemeral: true,
       });
       break;
     }
-    case 'test': {
+    case 'init': {
+      if (!interaction?.memberPermissions?.has('Administrator')) {
+        await interaction.reply({
+          ephemeral: true,
+          content: 'Sorry, you do not have the necessary permissions.',
+        });
+        return;
+      }
+
+      const user = interaction.options.getUser('user');
+      if (!user) {
+        await interaction.reply('User not found.');
+        return;
+      }
+      await userService.initializeUser(user.id);
+      await interaction.reply({
+        content: `Initialized user with id: ${user.id}`,
+        ephemeral: true,
+      });
+
       break;
     }
     case 'inventory': {
+      const items = await inventoryRepository.getItems(interaction.user.id);
+      const channelId = interaction.channelId;
+      const res = createInventoryEmbed(interaction.user.id, items);
+      if (!res) return;
+
       await interaction.reply({
-        embeds: [inventoryEmbed],
-        components: [...(getInventoryButtonRows() as any)],
+        embeds: [res.embed],
+        components: [...(res.components as any)],
         ephemeral: true,
       });
       break;

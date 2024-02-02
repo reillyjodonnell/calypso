@@ -1,18 +1,22 @@
 import Chance from 'chance';
 const chance = new Chance();
 
-// This represents all the types of dice we can roll
-type DieTypes = 4 | 6 | 8 | 10 | 12 | 20 | 100;
-
-export function roll(typeOfDie: DieTypes) {
-  const value = chance.rpg(`1d${typeOfDie}`, { sum: true });
+export function roll(dice: string) {
+  const value = chance.rpg(dice, { sum: true });
   return value as number;
 }
 
 export function parseDieAndRoll(die: string | null) {
+  console.log('die', die);
   if (!die) throw new Error('die is null');
 
-  const sides = parseInt(die.slice(1));
-  const result = roll(sides as DieTypes);
+  // it may include a +1 for damage modifier i.e. '1d4 + 1'
+  if (die.includes('+')) {
+    const [dieType, modifier] = die.split('+');
+    const result = roll(dieType) + parseInt(modifier);
+    return result;
+  }
+
+  const result = roll(die);
   return result;
 }

@@ -14,6 +14,10 @@ export class StoreInteractionHandler {
     interaction: ButtonInteraction<CacheType>,
     id: string
   ) {
+    // TODO MAP THE IDs 1-7 TO THE CORRESPONDING ITEMS (THE IDS WONT MATCH)
+
+    // buy_2 -> 2
+
     // Get the user's ID
     const userId = interaction.user.id;
 
@@ -29,29 +33,26 @@ export class StoreInteractionHandler {
       });
       return;
     }
-    const price = parseInt(item.price);
+    const { price } = item;
 
     // Get the user's gold
     const userGold = await this.goldRepository.getGold(userId);
 
     // If the user does not have enough gold, reply with a message
     if (userGold < price) {
-      await interaction.reply(
-        'You do not have enough gold to purchase this item.'
-      );
+      await interaction.reply({
+        content: 'You do not have enough gold to purchase this item.',
+        ephemeral: true,
+      });
       return;
     }
 
     // If the user has enough gold, proceed with the purchase
     await this.goldRepository.spendGold(userId, price);
-    await this.inventoryRepository.awardItem(
-      userId,
-      item.name,
-      item.description,
-      1
-    );
-    await interaction.reply(
-      `You have purchased a ${item.name} for ${price} gold.`
-    );
+    await this.inventoryRepository.awardItem(userId, item);
+    await interaction.reply({
+      content: `You have purchased a ${item.name} for ${price} gold.`,
+      ephemeral: true,
+    });
   }
 }

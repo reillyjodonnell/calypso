@@ -7,6 +7,14 @@ export class Player {
   private numberOfHeals = 2;
   private healsUsed = 0;
   private targetId: string | null = null;
+  // may include multiple numbers
+  private criticalHit: number[] = [20];
+  // may include multiple numbers
+  private criticalFail: number[] = [1];
+  // may also include +1 for damage modifier
+  private rollForDamage: string = '1d6';
+  // may also include +1 for to hit modifier
+  private rollToHit: string = '1d20';
 
   constructor(id: string) {
     this.id = id;
@@ -49,6 +57,31 @@ export class Player {
   }
   public setTargetId(targetId: string) {
     this.targetId = targetId;
+  }
+
+  public getCriticalHit() {
+    return this.criticalHit;
+  }
+  public setCriticalHit(criticalHit: number[]) {
+    this.criticalHit = criticalHit;
+  }
+  public getCriticalFail() {
+    return this.criticalFail;
+  }
+  public setCriticalFail(criticalFail: number[]) {
+    this.criticalFail = criticalFail;
+  }
+  public getDamage() {
+    return this.rollForDamage;
+  }
+  public setDamage(rollForDamage: string) {
+    this.rollForDamage = rollForDamage;
+  }
+  public getRollToHit() {
+    return this.rollToHit;
+  }
+  public setRollToHit(rollToHit: string) {
+    this.rollToHit = rollToHit;
   }
 
   // New method to clear the target

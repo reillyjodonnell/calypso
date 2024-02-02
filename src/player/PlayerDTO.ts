@@ -8,6 +8,11 @@ export class PlayerDTO {
   private numberOfHeals = 2;
   private healsUsed = 0;
   private targetId: string | null = null;
+  private criticalHit: number[] = [20];
+  private criticalFail: number[] = [1];
+  private rollForDamage: string = '1d6';
+  private rollToHit: string = '1d20';
+
   constructor(player: Player) {
     this.id = player.getId();
     this.health = player.getHealth();
@@ -16,6 +21,10 @@ export class PlayerDTO {
     this.numberOfHeals = player.getNumberOfHeals();
     this.healsUsed = player.getHealsUsed();
     this.targetId = player.getTargetId();
+    this.criticalHit = player.getCriticalHit();
+    this.criticalFail = player.getCriticalFail();
+    this.rollForDamage = player.getDamage();
+    this.rollToHit = player.getRollToHit();
   }
 
   // Optionally, add a method to convert back to a Player instance
@@ -27,6 +36,10 @@ export class PlayerDTO {
     player.setMaxHealth(playerDTO.maxHealth);
     player.setHealsUsed(playerDTO.healsUsed);
     player.setTargetId(playerDTO.targetId ?? '');
+    player.setCriticalHit(playerDTO.criticalHit);
+    player.setCriticalFail(playerDTO.criticalFail);
+    player.setDamage(playerDTO.rollForDamage);
+    player.setRollToHit(playerDTO.rollToHit);
     return player;
   }
 }

@@ -1,5 +1,18 @@
 import { SlashCommandBuilder } from 'discord.js';
 
+// ADMINS
+export const initCommand = new SlashCommandBuilder()
+  .setName('init')
+  .setDescription('Initializes data for a specified user')
+  .addUserOption((option) =>
+    option
+      .setName('user')
+      .setDescription('The user to initialize')
+      .setRequired(true)
+  );
+
+//REGULAR
+
 export const goldCommand = new SlashCommandBuilder()
   .setName('gold')
   .setDescription('View your gold');
@@ -72,7 +85,7 @@ export const healCommand = new SlashCommandBuilder()
       .setName('dice')
       .setDescription('The dice to roll')
       .setRequired(true)
-      .addChoices({ name: 'd4', value: 'd4' })
+      .addChoices({ name: 'd4', value: '1d4' })
   );
 
 export const statsCommand = new SlashCommandBuilder()

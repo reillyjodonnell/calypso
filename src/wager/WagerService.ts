@@ -78,7 +78,6 @@ export class WagerService {
     winnerId: string;
   }): Promise<SettledWager[]> {
     const wagers = await this.wagerManager.getWagers(threadId);
-    console.log(wagers);
     const settled: SettledWager[] = [];
     for (const wager of wagers) {
       if (wager.betOnPlayerId === winnerId) {
