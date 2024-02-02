@@ -1,0 +1,34 @@
+[
+  {
+    "name": "Simple Sword",
+    "damage": "1d6",
+    "critHit": [20],
+    "critFail": [1]
+  },
+  {
+    "name": "Simple Dagger",
+    "damage": "1d4+1",
+    "critHit": [19, 20],
+    "critFail": [1]
+  },
+  {
+    "name": "Simple Warhammer",
+    "damage": "1d8",
+    "critHit": [],
+    "critFail": [0, 1],
+    "hitBonus": -1
+  },
+  {
+    "name": "Simple Bow",
+    "damage": "1d6",
+    "critHit": [20],
+    "critFail": [2, 3],
+    "hitBonus": 1
+  },
+  {
+    "name": "Wooden Staff",
+    "damage": "1d4+1",
+    "critHit": [20],
+    "critFail": [1]
+  }
+]
