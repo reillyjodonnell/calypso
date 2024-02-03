@@ -3,7 +3,7 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "dev": "bun run --watch index.ts"
+    "dev": "bun run --hot index.ts"
   },
   "devDependencies": {
     "@types/chance": "^1.1.6",
@@ -20,6 +20,8 @@
     "ffmpeg-static": "^5.2.0",
     "nanoid": "^5.0.4",
     "redis": "^4.6.12",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.7.0",
     "yt-dlp-wrap": "^2.3.12",
     "ytdl-core": "^4.11.5"
   }

@@ -1,5 +1,5 @@
 import { Weapon } from '../item/weapon';
-import { InventoryRepository } from './InventoryRepository';
+import { InventoryItem, InventoryRepository } from './InventoryRepository';
 
 export class InventoryService {
   private inventoryRepository: InventoryRepository;
@@ -13,11 +13,11 @@ export class InventoryService {
     weaponId,
     playerId,
   }: {
-    weapons: Weapon[];
+    weapons: InventoryItem[];
     weaponId: string;
     playerId: string;
   }): Promise<void> {
-    const weaponToEquip = weapons.find((item) => item.getId() === weaponId);
+    const weaponToEquip = weapons.find((item) => item.id === weaponId);
 
     if (!weaponToEquip) {
       throw new Error('Weapon does not exist in inventory');
@@ -25,15 +25,15 @@ export class InventoryService {
 
     // Ensure only one weapon is equipped at a time
     for (const item of weapons) {
-      if (item instanceof Weapon) {
-        if (item.getEquipped()) {
-          item.setEquipped(false);
+      if (item) {
+        if (item.equipped) {
+          item.equipped = false;
           await this.inventoryRepository.saveItem(playerId, item);
         }
       }
     }
 
-    weaponToEquip.setEquipped(true);
+    weaponToEquip.equipped = true;
     await this.inventoryRepository.saveItem(playerId, weaponToEquip);
   }
 

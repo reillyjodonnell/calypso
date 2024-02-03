@@ -1,7 +1,12 @@
 import { RedisClientType } from '@redis/client';
 import { Item } from '../item/Item';
-import { WeaponDTO } from '../item/WeaponDTO';
 import { Weapon } from '../item/weapon';
+
+export type InventoryItem = {
+  quantity: number;
+  equipped: boolean;
+  id: string;
+};
 
 export class InventoryRepository {
   private redisClient: RedisClientType;
@@ -11,64 +16,65 @@ export class InventoryRepository {
   }
 
   async awardItem(playerId: string, item: Item | Weapon): Promise<void> {
-    // check if item is a weapon
     if (item instanceof Weapon) {
-      const weaponDTO = new WeaponDTO(item as Weapon);
       const inventoryKey = `user:${playerId}:inventory`;
-      const serializedWeapon = JSON.stringify(weaponDTO);
-      // Add the item JSON string to the user's inventory hash
-      await this.redisClient.hSet(inventoryKey, weaponDTO.id, serializedWeapon);
+      const itemRecord = await this.redisClient.hGet(
+        inventoryKey,
+        item.getId()
+      );
+
+      let inventoryData;
+      if (itemRecord) {
+        inventoryData = JSON.parse(itemRecord);
+        inventoryData.quantity += 1; // Increment quantity
+      } else {
+        inventoryData = { id: item.getId(), quantity: 1, equipped: false };
+      }
+
+      await this.redisClient.hSet(
+        inventoryKey,
+        item.getId(),
+        JSON.stringify(inventoryData)
+      );
     } else {
       console.log('Item is not a weapon! Rn we only support weapons');
     }
   }
 
-  async saveItem(playerId: string, item: Item | Weapon): Promise<void> {
-    // check if item is a weapon
-    if (item instanceof Weapon) {
-      const weaponDTO = new WeaponDTO(item as Weapon);
-      const inventoryKey = `user:${playerId}:inventory`;
-      const serializedWeapon = JSON.stringify(weaponDTO);
-      // Add the item JSON string to the user's inventory hash
-      await this.redisClient.hSet(inventoryKey, weaponDTO.id, serializedWeapon);
-    } else {
-      console.log('Item is not a weapon! Rn we only support weapons');
-    }
-  }
-
-  async getItem(playerId: string, item: string) {
+  async getItem(
+    playerId: string,
+    itemId: string
+  ): Promise<InventoryItem | null> {
     const inventoryKey = `user:${playerId}:inventory`;
-    const itemJson = await this.redisClient.hGet(inventoryKey, item);
+    const itemRecord = await this.redisClient.hGet(inventoryKey, itemId);
 
-    if (!itemJson) return null;
-    const weaponDTO = JSON.parse(itemJson);
-    return WeaponDTO.fromDTO(weaponDTO);
+    if (!itemRecord) return null;
+    return JSON.parse(itemRecord);
   }
 
-  async removeItem(playerId: string, item: string): Promise<void> {
+  async removeItem(playerId: string, itemId: string): Promise<void> {
     const inventoryKey = `user:${playerId}:inventory`;
-
-    // Remove the item from the user's inventory hash
-    await this.redisClient.hDel(inventoryKey, item);
+    await this.redisClient.hDel(inventoryKey, itemId);
   }
 
-  async getItems(playerId: string) {
+  async getItems(playerId: string): Promise<InventoryItem[]> {
     const inventoryKey = `user:${playerId}:inventory`;
     const itemsHash = await this.redisClient.hGetAll(inventoryKey);
 
-    if (!itemsHash) return null;
-
-    const items = Object.values(itemsHash).map((itemJson) => {
-      const weaponDTO = JSON.parse(itemJson);
-      return WeaponDTO.fromDTO(weaponDTO);
-    });
-
-    return items;
+    return Object.values(itemsHash).map((itemJson) => JSON.parse(itemJson));
   }
 
   async getActiveWeapon(playerId: string) {
     const items = await this.getItems(playerId);
-    if (!items) return null;
-    return items.find((item) => item.getEquipped());
+    return items.find((item) => item.equipped);
+  }
+
+  async saveItem(playerId: string, updatedItem: InventoryItem): Promise<void> {
+    const inventoryKey = `user:${playerId}:inventory`;
+    await this.redisClient.hSet(
+      inventoryKey,
+      updatedItem.id,
+      JSON.stringify(updatedItem)
+    );
   }
 }

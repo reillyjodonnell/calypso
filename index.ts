@@ -7,7 +7,8 @@ import {
   InteractionType,
   ActionRowBuilder,
   TextInputStyle,
-  APIEmbed,
+  PermissionFlagsBits,
+  Partials,
 } from 'discord.js';
 import { DuelService } from './src/duel/DuelService';
 import { DiscordService } from './src/discord/DiscordService';
@@ -44,7 +45,6 @@ import { WagerManager } from './src/wager/WagerManager';
 import { WagerRepository } from './src/wager/WagerRepository';
 import { DuelInteractionHandler } from './src/duel/DuelInteractionHandler';
 import { PlayerRepository } from './src/player/PlayerRepository';
-import { PlayerService } from './src/player/PlayerService';
 import { DuelWinManager } from './src/duel/DuelWinManager';
 import { StoreInteractionHandler } from './src/store/StoreInteractionHandler';
 import { InventoryRepository } from './src/inventory/InventoryRepository';
@@ -57,6 +57,8 @@ import {
 import { Weapon } from './src/item/weapon';
 import { UserService } from './src/user/UserService';
 import { InventoryService } from './src/inventory/InventoryService';
+import { WeaponRepository } from './src/weapon/WeaponRepository';
+import { createStatsEmbed } from './src/duel/DuelStatsEmbed';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -79,16 +81,16 @@ redisClient.on('connect', (stream) => {
 await redisClient.connect();
 
 // Repositories
-
-//@ts-ignore
 const goldRepository = new GoldRepository(redisClient);
 const goldManager = new GoldManager(goldRepository);
-//@ts-ignore
+
 const wagerRepository = new WagerRepository(redisClient);
 const wagerManager = new WagerManager(wagerRepository);
 
 const duelRepository = new DuelRepository(redisClient);
 const playerRepository = new PlayerRepository(redisClient);
+
+const weaponRepository = new WeaponRepository(redisClient);
 
 // Clean up
 const duelCleanup = new DuelCleanup(
@@ -98,7 +100,6 @@ const duelCleanup = new DuelCleanup(
 );
 
 const discordService = new DiscordService();
-const playerService = new PlayerService();
 const duelService = new DuelService();
 const wagerService = new WagerService(goldManager, wagerManager, duelService);
 
@@ -113,12 +114,12 @@ const inventoryRepository = new InventoryRepository(redisClient);
 const dualInteractionHandler = new DuelInteractionHandler(
   duelRepository,
   playerRepository,
-  playerService,
   duelService,
   discordService,
   duelWinManager,
   duelCleanup,
-  inventoryRepository
+  inventoryRepository,
+  weaponRepository
 );
 const storeRepository = new StoreRepository();
 const storeInteractionHandler = new StoreInteractionHandler(
@@ -149,15 +150,56 @@ try {
     ],
   });
 } catch (error) {
-  console.log(error);
   console.error(error);
 }
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
-client.on('ready', () => {
-  console.log(`Logged in as ${client.user?.tag}!`);
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds],
 });
+
+client.on('ready', async () => {
+  console.log(`Logged in as ${client.user?.tag}!`);
+
+  const guildId = process.env.GUILD_ID;
+  if (!guildId) {
+    console.error('GUILD_ID not found in .env');
+    return;
+  }
+  // Replace 'YOUR_GUILD_ID' with the actual ID of your guild (server)
+  let guild = client.guilds.cache.get(guildId);
+  if (!guild) {
+    // make a request to discord
+    guild = await client.guilds.fetch(guildId);
+  }
+
+  if (!guild) {
+    console.error('No guild from discord! Be sure the GUILD_ID is right!');
+    return;
+  }
+
+  const botMember = guild.members.cache.get(process.env.CALYPSO_ID as string);
+
+  if (
+    !botMember?.permissions.has(PermissionFlagsBits.ManageChannels) ||
+    !botMember.permissions.has(PermissionFlagsBits.ManageRoles)
+  ) {
+    console.log(
+      'Bot does not have required permissions: Manage Channels and Manage Roles.'
+    );
+    return;
+  }
+
+  // Now pass this channel to your function
+  await discordService.createStartHereMessage(guild);
+  if (process.env.INIT_SERVER === 'true') {
+    const weapons = await storeRepository.getItems();
+    await discordService.initializeServer(guild, weapons);
+  }
+});
+
+// client.on('messageReactionAdd', async (reaction, user) => {
+
+// });
 
 client.on('error', (err) => {
   console.error('client error', err);
@@ -173,7 +215,6 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.channelId) throw new Error('interaction.channelId is null');
 
   if (interaction.type === InteractionType.ModalSubmit) {
-    // const { action, guildId, threadId } = parseButtonId(interaction.customId);
     const { threadId, playerToBetOn, action, guildId } = parseWagerId(
       interaction.customId
     );
@@ -283,6 +324,60 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (interaction.isButton()) {
+    console.log('Button');
+    if (interaction.customId === 'enter_arena') {
+      console.log('ENTER ARENA CALLED!');
+      const guild = interaction.guild;
+
+      if (!guild) {
+        console.error('No guild found');
+        return;
+      }
+      const member = guild.members.cache.get(interaction.user.id);
+      if (!member) {
+        console.error('No member found');
+        return;
+      }
+
+      if (!process.env.START_HERE_MESSAGE_ID) {
+        throw new Error('No start here message id found');
+      }
+
+      let gladiatorRole = guild.roles.cache.find(
+        (role) => role.name === '🛡️ Gladiator'
+      );
+      if (!gladiatorRole) {
+        console.log('Gladiator role not found');
+        return;
+      }
+
+      // check if they;re already a gladiator
+      if (member.roles.cache.has(gladiatorRole.id)) {
+        interaction.reply({
+          content: 'You are already a gladiator!',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      try {
+        console.log('Adding role to user');
+        await member.roles.add(gladiatorRole);
+        console.log('User added to role');
+        interaction.reply({
+          content: 'You are now a gladiator!',
+          ephemeral: true,
+        });
+      } catch (error) {
+        console.error(
+          `Error adding Gladiator role to ${interaction.user.id}:`,
+          error
+        );
+      }
+
+      return;
+    }
+
     const { action, guildId, threadId } = parseButtonId(interaction.customId);
     if (action === 'wager') {
       dualInteractionHandler.handleWager(interaction);
@@ -317,18 +412,28 @@ client.on('interactionCreate', async (interaction) => {
       }
     }
     const storeAction = interaction.customId;
-    console.log('store action:', storeAction);
     // inventory
     if (storeAction.startsWith('use')) {
       const { action, itemId, playerId } = parseInventoryButtonId(storeAction);
-      const item = await inventoryRepository.getItem(playerId, itemId);
-      if (!item) {
+      const res = await inventoryRepository.getItem(playerId, itemId);
+      if (!res) {
         await interaction.reply({
           content: 'Item not found.',
           ephemeral: true,
         });
         return;
       }
+      const { id } = res;
+      // fetch that weapon by the id
+      const fetchedWeapon = await weaponRepository.getWeapon(id);
+      if (!fetchedWeapon) {
+        await interaction.reply({
+          content: 'Item not found.',
+          ephemeral: true,
+        });
+        return;
+      }
+
       const weapons = await inventoryRepository.getItems(playerId);
       if (!weapons) {
         await interaction.reply({
@@ -337,10 +442,10 @@ client.on('interactionCreate', async (interaction) => {
         });
         return;
       }
-      if (item instanceof Weapon) {
-        inventoryService.equipWeapon({ weapons, playerId, weaponId: itemId });
-        interaction.reply({
-          content: `You've equipped the ${item.getName()}`,
+      if (fetchedWeapon instanceof Weapon) {
+        inventoryService.equipWeapon({ weapons, playerId, weaponId: id });
+        await interaction.reply({
+          content: `You've equipped the ${fetchedWeapon.getName()}`,
           ephemeral: true,
         });
       }
@@ -417,9 +522,33 @@ client.on('interactionCreate', async (interaction) => {
       break;
     }
     case 'inventory': {
-      const items = await inventoryRepository.getItems(interaction.user.id);
-      const channelId = interaction.channelId;
-      const res = createInventoryEmbed(interaction.user.id, items);
+      const itemIds = await inventoryRepository.getItems(interaction.user.id);
+      const activeItemId = await inventoryRepository.getActiveWeapon(
+        interaction.user.id
+      );
+      if (!itemIds || !activeItemId) {
+        await interaction.reply({
+          content: 'No items found.',
+          ephemeral: true,
+        });
+        return;
+      }
+      let fetchedWeapons = [];
+      for (const { id } of itemIds) {
+        const weapon = await weaponRepository.getWeapon(id);
+        if (weapon) {
+          fetchedWeapons.push(weapon);
+        }
+      }
+      const equippedWeapon = fetchedWeapons.find(
+        (weapon) => weapon.getId() === activeItemId.id
+      );
+
+      const res = createInventoryEmbed(
+        interaction.user.id,
+        fetchedWeapons,
+        equippedWeapon
+      );
       if (!res) return;
 
       await interaction.reply({
@@ -434,54 +563,52 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     case 'stats': {
-      // retrieve that players stats from the db
-      // const playerStats = getPlayerStats(interaction.user.id); // Implement this function based on your data structure
-      function getPlayerStats() {
-        return {
-          name: 'Ares',
-          level: 1,
-          health: 14,
-          maxHealth: 14,
-          ac: 11,
-          strength: 10,
-          dexterity: 10,
-          currentXP: 0,
-          nextLevelXP: 100,
-        };
+      // make sure they're saying it from the duel thread
+      const duelThread = await discordService.findDuelThread(
+        interaction.guild,
+        interaction?.channelId
+      );
+      if (!duelThread) {
+        await interaction.reply({
+          content: 'This command can only be used in a duel!.',
+          ephemeral: true,
+        });
+        return;
       }
-      const playerStats = getPlayerStats();
-      const infoEmbed = new EmbedBuilder()
-        .setColor(0x00ae86) // Set a color for the embed
-        .setTitle(`${playerStats.name}'s Character Stats`)
-        .addFields(
-          { name: 'Level', value: playerStats.level.toString(), inline: true },
-          {
-            name: 'Health',
-            value: `${playerStats.health}/${playerStats.maxHealth} HP`,
-            inline: true,
-          },
-          { name: 'AC', value: playerStats.ac.toString(), inline: true },
-          // Add more fields for other stats like Strength, Dexterity, etc.
-          {
-            name: 'Strength',
-            value: playerStats.strength.toString(),
-            inline: true,
-          },
-          {
-            name: 'Dexterity',
-            value: playerStats.dexterity.toString(),
-            inline: true,
-          },
-          // ... include other relevant stats
-          {
-            name: 'Experience Points',
-            value: `${playerStats.currentXP}/${playerStats.nextLevelXP} XP`,
-            inline: false, // This might be better as a non-inline field for clarity
-          }
-        )
-        .setFooter({ text: 'Stay strong in the arena!' });
 
-      await interaction.reply({ embeds: [infoEmbed] });
+      const player = await playerRepository.getById(
+        duelThread.id,
+        interaction.user.id
+      );
+      if (!player) {
+        await interaction.reply({
+          content: 'Player not found.',
+          ephemeral: true,
+        });
+        return;
+      }
+      const activeWeapon = await inventoryRepository.getActiveWeapon(
+        interaction.user.id
+      );
+      const weapon = activeWeapon
+        ? await weaponRepository.getWeapon(activeWeapon.id)
+        : null;
+
+      if (!weapon) {
+        await interaction.reply({
+          content: 'No weapon found.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const statsEmbed = createStatsEmbed(
+        interaction.user.displayName,
+        player,
+        weapon
+      );
+
+      await interaction.reply({ embeds: [statsEmbed], ephemeral: true });
       break;
     }
 

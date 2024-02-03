@@ -22,7 +22,6 @@ import {
   DUEL_NOT_FOUND,
   DUEL_STARTED,
   DuelService,
-  NOT_PLAYERS_TURN,
   PLAYER_ALREADY_ROLLED,
   PLAYER_NOT_CHALLENGED,
   PLAYER_NOT_FOUND,
@@ -39,7 +38,6 @@ import {
   parseButtonId,
 } from '../buttons';
 import { DuelRepository } from './DuelRepository';
-import { PlayerService } from '../player/PlayerService';
 import { DuelWinManager } from './DuelWinManager';
 import {
   FALL_DOWN,
@@ -48,17 +46,18 @@ import {
 } from '../randomEvents/RandomEventsGenerator';
 import { DuelCleanup } from './DuelCleanup';
 import { InventoryRepository } from '../inventory/InventoryRepository';
+import { WeaponRepository } from '../weapon/WeaponRepository';
 
 export class DuelInteractionHandler {
   constructor(
     private duelRepository: DuelRepository,
     private playerRepository: PlayerRepository,
-    private playerService: PlayerService,
     private duelService: DuelService,
     private discordService: DiscordService,
     private duelWinManager: DuelWinManager,
     private duelCleanup: DuelCleanup,
-    private inventoryRepository: InventoryRepository
+    private inventoryRepository: InventoryRepository,
+    private weaponRepository: WeaponRepository
   ) {}
 
   async handleDuel(interaction: ChatInputCommandInteraction<CacheType>) {
@@ -71,16 +70,33 @@ export class DuelInteractionHandler {
     });
 
     // for both we need to get their weapons, find which is equipped, then pass it
-    const challengerWeapon = await this.inventoryRepository.getActiveWeapon(
+    const challengerWeaponRes = await this.inventoryRepository.getActiveWeapon(
       challengerId
     );
-    const challengedWeapon = await this.inventoryRepository.getActiveWeapon(
+    const challengedWeaponRes = await this.inventoryRepository.getActiveWeapon(
       user.id
     );
 
-    if (!challengerWeapon || !challengedWeapon) {
+    if (!challengerWeaponRes || !challengedWeaponRes) {
       await interaction.reply({
         content: 'You or your opponent do not have a weapon equipped!',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const challengerWeapon = await this.weaponRepository.getWeapon(
+      challengedWeaponRes.id
+    );
+    const challengedWeapon = await this.weaponRepository.getWeapon(
+      challengedWeaponRes.id
+    );
+
+    console.log('crit hit array for dinky: ', challengedWeapon?.getCritHit());
+
+    if (!challengerWeapon || !challengedWeapon) {
+      await interaction.reply({
+        content: 'Trouble fetching weapons! Try again.',
         ephemeral: true,
       });
       return;
@@ -178,7 +194,7 @@ export class DuelInteractionHandler {
     const duel = await this.duelRepository.getById(duelThread.id);
 
     if (!duel) {
-      interaction.reply({
+      await interaction.reply({
         content: 'Duel not found. Please try again!',
         ephemeral: true,
       });
@@ -232,7 +248,7 @@ export class DuelInteractionHandler {
     }
 
     if (status === DUEL_ACCEPTED) {
-      interaction.reply(`Duel accepted!`);
+      await interaction.reply(`Duel accepted!`);
       return;
     }
 
@@ -260,7 +276,7 @@ export class DuelInteractionHandler {
         wagerButton
       );
 
-      interaction.reply(
+      await interaction.reply(
         `All players are now ready!\n\nWagering is open until a player rolls for initiative! Good luck!`
       );
       const mentionPlayers = ids?.map((id: string) => `<@${id}>`).join(' ');
@@ -293,7 +309,7 @@ export class DuelInteractionHandler {
       return;
     }
 
-    const dice = 'd20';
+    const dice = '1d20';
 
     if (!dice) throw new Error('dice is null');
 
@@ -674,6 +690,11 @@ export class DuelInteractionHandler {
           content: `${description}\n\n<@${nextPlayerId}> wins!`,
           components: [row as any],
         });
+
+        await interaction.followUp({
+          content: `<@${nextPlayerId}> has won 5 gold!`,
+        });
+
         if (wagerResults) {
           await interaction.followUp({ embeds: [wagerResults] });
         }
@@ -772,7 +793,7 @@ export class DuelInteractionHandler {
       interaction.user.id
     );
     if (!attacker) {
-      interaction.reply({
+      await interaction.reply({
         content: 'Uh oh. We had troubles. Try again!',
         ephemeral: true,
       });
@@ -782,6 +803,8 @@ export class DuelInteractionHandler {
     const res = this.duelService.getAttackerTargetId(attacker);
 
     if (res.status === PLAYER_NOT_FOUND || !res.targetId) {
+      console.log('status: ', res.status);
+      console.log('targetId: ', res.targetId);
       await interaction.reply({
         content: 'You need to select a target first!',
         ephemeral: true,
@@ -879,6 +902,10 @@ export class DuelInteractionHandler {
           roll! + (criticalHit ? criticalHitRoll! : 0)
         } damage! You see the light leave their eyes. You killed <@${defender.getId()}>! <@${winnerId}> wins!`
       );
+      //  message user that they won 5 gold
+      await interaction.followUp({
+        content: `<@${winnerId}> has won 5 gold!`,
+      });
       // lock the thread bc the game is over
       await duelThread.setLocked(true);
       const wagerResults = await this.duelWinManager.handleWin(
@@ -977,7 +1004,7 @@ export class DuelInteractionHandler {
       ephemeral: true,
     });
     if (interaction.guildId !== guildId || interaction.channelId !== threadId) {
-      interaction.reply({
+      await interaction.reply({
         content: 'Wrong thread',
         ephemeral: true,
       });

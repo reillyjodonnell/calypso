@@ -8,7 +8,8 @@ import { Weapon } from '../item/weapon';
 
 export function createInventoryEmbed(
   playerId: string,
-  inventory: Weapon[] | null
+  inventory: Weapon[] | null,
+  equippedWeapon: Weapon | undefined
 ) {
   // return an empty inventory message if the user has no items
   if (!inventory || inventory.length === 0) {
@@ -39,11 +40,13 @@ export function createInventoryEmbed(
       .setCustomId(createInventoryButtonId({ playerId, itemId: item.getId() }))
       .setLabel(
         `${item.getEmoji()} ${
-          item.getEquipped() ? 'Unequip' : 'Equip'
+          item.id === equippedWeapon?.getId() ? 'Unequip' : 'Equip'
         } ${item.getName()}`
       )
       .setStyle(
-        item.getEquipped() ? ButtonStyle.Secondary : ButtonStyle.Primary
+        item.id === equippedWeapon?.getId()
+          ? ButtonStyle.Secondary
+          : ButtonStyle.Primary
       )
   );
 

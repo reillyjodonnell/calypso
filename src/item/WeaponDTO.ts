@@ -3,7 +3,6 @@ import { Weapon } from './weapon';
 export class WeaponDTO {
   id: string;
   name: string;
-  equipped: boolean;
   description: string;
   type: string;
   rarity: string;
@@ -19,7 +18,6 @@ export class WeaponDTO {
   constructor(weapon: Weapon) {
     this.id = weapon.getId();
     this.name = weapon.getName();
-    this.equipped = weapon.getEquipped();
     this.description = weapon.getDescription();
     this.type = weapon.getType();
     this.rarity = weapon.getRarity();
@@ -36,7 +34,6 @@ export class WeaponDTO {
   // Optionally, add a method to convert back to a Weapon instance
   static fromDTO(weaponDTO: WeaponDTO): Weapon {
     const weapon = new Weapon({
-      equipped: weaponDTO.equipped,
       id: weaponDTO.id,
       name: weaponDTO.name,
       description: weaponDTO.description,

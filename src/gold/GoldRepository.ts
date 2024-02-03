@@ -1,4 +1,4 @@
-import { RedisClientType } from 'redis';
+import { RedisClientType } from '@redis/client';
 
 export interface GoldRepositoryInterface {
   awardGold(playerId: string, amount: number): Promise<void>;

@@ -1,8 +1,6 @@
 import { Item } from './Item';
 
 export class Weapon extends Item {
-  private equipped: boolean;
-
   private emoji: string;
   private damage: string;
   private rollToHit: string;
@@ -16,7 +14,6 @@ export class Weapon extends Item {
     name,
     description,
     type,
-    equipped,
     rarity,
     price,
     emoji,
@@ -29,7 +26,6 @@ export class Weapon extends Item {
   }: {
     id: string;
     name: string;
-    equipped: boolean;
     description: string;
     type: string;
     rarity: string;
@@ -50,7 +46,6 @@ export class Weapon extends Item {
     this.critFail = critFail;
     this.critChance = critChance;
     this.critFailChance = critFailChance;
-    this.equipped = equipped;
   }
 
   // Add methods to get and set the properties
@@ -60,12 +55,7 @@ export class Weapon extends Item {
   setId(id: string) {
     this.id = id;
   }
-  getEquipped() {
-    return this.equipped;
-  }
-  setEquipped(equipped: boolean) {
-    this.equipped = equipped;
-  }
+
   getDescription() {
     return this.description;
   }

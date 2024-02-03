@@ -1,4 +1,4 @@
-import { RedisClientType } from 'redis';
+import { RedisClientType } from '@redis/client';
 import { Wager } from './WagerManager';
 
 export interface WagerRepositoryInterface {
