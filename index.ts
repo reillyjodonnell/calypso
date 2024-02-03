@@ -3,12 +3,10 @@ import {
   Routes,
   Client,
   GatewayIntentBits,
-  EmbedBuilder,
   InteractionType,
   ActionRowBuilder,
   TextInputStyle,
   PermissionFlagsBits,
-  Partials,
 } from 'discord.js';
 import { DuelService } from './src/duel/DuelService';
 import { DiscordService } from './src/discord/DiscordService';
@@ -59,7 +57,8 @@ import { UserService } from './src/user/UserService';
 import { InventoryService } from './src/inventory/InventoryService';
 import { WeaponRepository } from './src/weapon/WeaponRepository';
 import { createStatsEmbed } from './src/duel/DuelStatsEmbed';
-
+import { OpenAI } from 'openai';
+import { splitMessage, systemPrompt } from './src/ai/aiHelper';
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 
@@ -67,6 +66,12 @@ if (!TOKEN || !CLIENT_ID) {
   console.error('Missing TOKEN or CLIENT_ID');
   process.exit(1);
 }
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export type openaiType = typeof openai;
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
@@ -119,7 +124,8 @@ const dualInteractionHandler = new DuelInteractionHandler(
   duelWinManager,
   duelCleanup,
   inventoryRepository,
-  weaponRepository
+  weaponRepository,
+  openai
 );
 const storeRepository = new StoreRepository();
 const storeInteractionHandler = new StoreInteractionHandler(
@@ -353,7 +359,7 @@ client.on('interactionCreate', async (interaction) => {
 
       // check if they;re already a gladiator
       if (member.roles.cache.has(gladiatorRole.id)) {
-        interaction.reply({
+        awaitinteraction.reply({
           content: 'You are already a gladiator!',
           ephemeral: true,
         });
@@ -364,7 +370,7 @@ client.on('interactionCreate', async (interaction) => {
         console.log('Adding role to user');
         await member.roles.add(gladiatorRole);
         console.log('User added to role');
-        interaction.reply({
+        await interaction.reply({
           content: 'You are now a gladiator!',
           ephemeral: true,
         });

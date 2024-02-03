@@ -47,6 +47,8 @@ import {
 import { DuelCleanup } from './DuelCleanup';
 import { InventoryRepository } from '../inventory/InventoryRepository';
 import { WeaponRepository } from '../weapon/WeaponRepository';
+import { openaiType } from '../..';
+import { requestAIResponse } from '../ai/aiHelper';
 
 export class DuelInteractionHandler {
   constructor(
@@ -57,7 +59,8 @@ export class DuelInteractionHandler {
     private duelWinManager: DuelWinManager,
     private duelCleanup: DuelCleanup,
     private inventoryRepository: InventoryRepository,
-    private weaponRepository: WeaponRepository
+    private weaponRepository: WeaponRepository,
+    private openai: openaiType
   ) {}
 
   async handleDuel(interaction: ChatInputCommandInteraction<CacheType>) {
@@ -91,8 +94,6 @@ export class DuelInteractionHandler {
     const challengedWeapon = await this.weaponRepository.getWeapon(
       challengedWeaponRes.id
     );
-
-    console.log('crit hit array for dinky: ', challengedWeapon?.getCritHit());
 
     if (!challengerWeapon || !challengedWeapon) {
       await interaction.reply({
@@ -220,7 +221,7 @@ export class DuelInteractionHandler {
 
     if (status === ALREADY_ACCEPTED_DUEL) {
       await interaction.reply({
-        content: 'You have already accepted the duel',
+        content: 'You have already accepted the duel!',
         ephemeral: true,
       });
       return;
@@ -228,7 +229,7 @@ export class DuelInteractionHandler {
 
     if (status === PLAYER_NOT_CHALLENGED) {
       await interaction.reply({
-        content: 'You are not the challenged user, dick',
+        content: 'You are not the challenged user.',
         ephemeral: true,
       });
       return;
@@ -348,6 +349,14 @@ export class DuelInteractionHandler {
     }
 
     if (status === PLAYER_ROLLED) {
+      const res = `${interaction.user.displayName} rolled a ${result} for initiative!\nWaiting for other players to roll for initiative.`;
+      await interaction.deferReply();
+      const message = await requestAIResponse(this.openai, interaction, res);
+
+      await interaction.followUp({
+        content: message,
+      });
+      return;
       await interaction.reply(
         `${interaction.user.displayName} rolled a ${result} for initiative!\nWaiting for other players to roll for initiative.`
       );
@@ -356,7 +365,9 @@ export class DuelInteractionHandler {
 
     if (status === ALL_PLAYERS_ROLLED) {
       if (!playerToGoFirst) throw new Error('playerToGoFirst is null');
-
+      const res = `${interaction.user.displayName} rolled a ${result} for initiative!\n\nAll players have rolled for initiative.\n\n <@${playerToGoFirst}> it's your turn!`;
+      await interaction.deferReply();
+      const message = await requestAIResponse(this.openai, interaction, res);
       const row = getAllButtonOptions({
         guildId: interaction.guildId,
         channelId: interaction.channelId,
@@ -365,6 +376,12 @@ export class DuelInteractionHandler {
         healId: this.duelService.getCounter(),
         leaveId: this.duelService.getCounter(),
       });
+      await interaction.followUp({
+        content: message,
+        components: [row as any], // Send the button with the message
+      });
+      return;
+
       await interaction.reply({
         content: `${interaction.user.displayName} rolled a ${result} for initiative!\n\nAll players have rolled for initiative.\n\n <@${playerToGoFirst}> it's your turn!`,
         components: [row as any], // Send the button with the message
@@ -575,7 +592,14 @@ export class DuelInteractionHandler {
         healId: this.duelService.getCounter(),
         leaveId: this.duelService.getCounter(),
       });
-
+      await interaction.deferReply();
+      const res = `You rolled a ${roll} and healed ${roll} health! You have ${healthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`;
+      const message = await requestAIResponse(this.openai, interaction, res);
+      await interaction.followUp({
+        content: message,
+        components: [row as any],
+      });
+      return;
       await interaction.reply({
         content: `You rolled a ${roll} and healed ${roll} health! You have ${healthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`,
         components: [row as any],
@@ -651,6 +675,14 @@ export class DuelInteractionHandler {
         false
       );
       const row = new ActionRowBuilder().addComponents(rollButton);
+      await interaction.deferReply();
+      const res = `You rolled a ${roll}. Critical hit! Damage is doubled. Roll for damage below!`;
+      const message = await requestAIResponse(this.openai, interaction, res);
+      await interaction.followUp({
+        content: message,
+        components: [row as any],
+      });
+      return;
       await interaction.reply({
         content: `You rolled a ${roll}. Critical hit! Damage is doubled. Roll for damage below!`,
         components: [row as any],
@@ -703,26 +735,36 @@ export class DuelInteractionHandler {
         if (!nextPlayerId) throw new Error('nextPlayer id is null');
       }
 
+      let statement = '';
       switch (status) {
         case SELF_HARM:
-          await interaction.reply({
-            content: `You swing at your target, but miss and hit yourself for ${damage} damage! You have ${healthRemaining} health remaining.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`,
-            components: [row as any],
-          });
+          statement = `You swing at your target, but miss and hit yourself for ${damage} damage! You have ${healthRemaining} health remaining.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`;
+
           break;
         case NO_EFFECT:
-          await interaction.reply({
-            content: `You swing at your target and miss terribly. Somehow you recovered!\n\n<@${nextPlayerId}> it's your turn!`,
-            components: [row as any],
-          });
+          statement = `You swing at your target and miss terribly. Somehow you recovered!\n\n<@${nextPlayerId}> it's your turn!`;
+
           break;
         case FALL_DOWN:
-          await interaction.reply({
-            content: `You swing at your target and miss terribly. You fall down and lose your turn!\n\n<@${nextPlayerId}> it's your turn!`,
-            components: [row as any],
-          });
+          statement = `You swing at your target and miss terribly. You fall down and lose your turn!\n\n<@${nextPlayerId}> it's your turn!`;
+
           break;
       }
+      await interaction.deferReply();
+      const message = await requestAIResponse(
+        this.openai,
+        interaction,
+        statement
+      );
+      await interaction.followUp({
+        content: message,
+        components: [row as any],
+      });
+      return;
+      await interaction.reply({
+        content: statement,
+        components: [row as any],
+      });
 
       return;
     }
@@ -738,12 +780,18 @@ export class DuelInteractionHandler {
         false
       );
       const row = new ActionRowBuilder().addComponents(rollButton);
-      await interaction.reply({
-        content: `You rolled a ${roll} and hit! Roll for damage below!`,
+      const res = `you rolled a ${roll} and hit! Roll for damage below!`;
+      await interaction.deferReply();
+      const message = await requestAIResponse(this.openai, interaction, res);
+
+      await interaction.followUp({
+        content: message,
         components: [row as any],
       });
       return;
     }
+    await interaction.deferReply();
+
     const row = getAllButtonOptions({
       guildId: interaction.guildId,
       channelId: interaction.channelId,
@@ -752,9 +800,15 @@ export class DuelInteractionHandler {
       healId: this.duelService.getCounter(),
       leaveId: this.duelService.getCounter(),
     });
+    const missedMessage = `You rolled a ${roll} and missed! :(\n\n<@${nextPlayerId}> it's your turn!`;
+    const message = await requestAIResponse(
+      this.openai,
+      interaction,
+      missedMessage
+    );
 
-    await interaction.reply({
-      content: `You rolled a ${roll} and missed! :(\n\n<@${nextPlayerId}> it's your turn!`,
+    await interaction.followUp({
+      content: message,
       components: [row as any],
     });
   }
