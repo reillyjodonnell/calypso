@@ -228,7 +228,7 @@ export class DuelInteractionHandler {
 
     if (status === PLAYER_NOT_CHALLENGED) {
       await interaction.reply({
-        content: 'You are not the challenged user, dick',
+        content: 'You are not the challenged user',
         ephemeral: true,
       });
       return;
