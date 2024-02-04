@@ -17,6 +17,13 @@ export function parseDieAndRoll(die: string | null) {
     return result;
   }
 
+  // it may include a -1 for damage modifier i.e. '1d4 - 1'
+  if (die.includes('-')) {
+    const [dieType, modifier] = die.split('-');
+    const result = roll(dieType) - parseInt(modifier);
+    return result;
+  }
+
   const result = roll(die);
   return result;
 }

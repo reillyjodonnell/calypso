@@ -15,15 +15,7 @@ import { DiscordService } from './src/discord/DiscordService';
 import { DuelRepository } from './src/duel/DuelRepository';
 import {
   duelCommand,
-  storeCommand,
-  acceptCommand,
-  attackCommand,
-  healCommand,
-  initiativeCommand,
-  rollForDamageCommand,
   statsCommand,
-  buyCommand,
-  testCommand,
   goldCommand,
   inventoryCommand,
   initCommand,
@@ -134,16 +126,8 @@ const inventoryService = new InventoryService(inventoryRepository);
 try {
   await rest.put(Routes.applicationCommands(CLIENT_ID), {
     body: [
-      storeCommand,
       duelCommand,
-      acceptCommand,
-      rollForDamageCommand,
-      healCommand,
-      attackCommand,
-      initiativeCommand,
       statsCommand,
-      buyCommand,
-      testCommand,
       goldCommand,
       inventoryCommand,
       initCommand,
@@ -197,17 +181,8 @@ client.on('ready', async () => {
   }
 });
 
-// client.on('messageReactionAdd', async (reaction, user) => {
-
-// });
-
 client.on('error', (err) => {
   console.error('client error', err);
-});
-
-client.on('guildMemberAdd', async (member) => {
-  const userId = member.id;
-  await userService.initializeUser(userId);
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -359,13 +334,14 @@ client.on('interactionCreate', async (interaction) => {
         });
         return;
       }
-
+      const userId = interaction.user.id;
       try {
         console.log('Adding role to user');
         await member.roles.add(gladiatorRole);
+        await userService.initializeUser(userId);
         console.log('User added to role');
         interaction.reply({
-          content: 'You are now a gladiator!',
+          content: 'You are now a gladiator! Welcome to the arena!',
           ephemeral: true,
         });
       } catch (error) {
@@ -489,16 +465,6 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   switch (interaction.commandName) {
-    case 'store': {
-      const weapons = await storeRepository.getItems();
-      const { components, embed } = createStoreEmbed(weapons);
-      await interaction.reply({
-        embeds: [embed],
-        components: [...(components as any)],
-        ephemeral: true,
-      });
-      break;
-    }
     case 'init': {
       if (!interaction?.memberPermissions?.has('Administrator')) {
         await interaction.reply({

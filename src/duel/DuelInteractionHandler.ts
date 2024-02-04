@@ -86,13 +86,16 @@ export class DuelInteractionHandler {
     }
 
     const challengerWeapon = await this.weaponRepository.getWeapon(
-      challengedWeaponRes.id
+      challengerWeaponRes.id
     );
     const challengedWeapon = await this.weaponRepository.getWeapon(
       challengedWeaponRes.id
     );
 
-    console.log('crit hit array for dinky: ', challengedWeapon?.getCritHit());
+    console.log(
+      'crit hit array for challenged player: ',
+      challengedWeapon?.getCritHit()
+    );
 
     if (!challengerWeapon || !challengedWeapon) {
       await interaction.reply({
@@ -701,6 +704,7 @@ export class DuelInteractionHandler {
         await duelThread.setLocked(true);
         await this.duelCleanup.remove(duelThread.id, duel);
         if (!nextPlayerId) throw new Error('nextPlayer id is null');
+        return;
       }
 
       switch (status) {

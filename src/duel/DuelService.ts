@@ -232,6 +232,10 @@ export class DuelService {
 
     const doesHitTarget = roll >= defender.getAC();
 
+    console.log(
+      `${attacker.getId()} rolled a ${roll}. Attack crits are ${attacker.getCriticalHit()}\n`
+    );
+
     if (doesHitTarget) {
       attacker.setTargetId(defender.getId());
 
