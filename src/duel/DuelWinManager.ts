@@ -4,6 +4,7 @@ import { GoldManager } from '../gold/GoldManager';
 import { Player } from '../player/player';
 import { WagerService } from '../wager/WagerService';
 import { DuelService } from './DuelService';
+import { LeaderboardApplicationService } from '../leaderboard/LeaderboardApplicationService';
 
 const GOLD_AMOUNT_FOR_WIN = 5;
 
@@ -12,7 +13,8 @@ export class DuelWinManager {
     private duelService: DuelService,
     private wagerService: WagerService,
     private goldManager: GoldManager,
-    private discordService: DiscordService
+    private discordService: DiscordService,
+    private leaderboardApplicationService: LeaderboardApplicationService
   ) {}
 
   async handleWin(
@@ -34,6 +36,8 @@ export class DuelWinManager {
           settledWagers,
           winnerId
         );
+
+        this.leaderboardApplicationService.recordWin(winnerId);
 
         return wagerResultsEmbed;
       }

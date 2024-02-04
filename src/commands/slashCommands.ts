@@ -1,16 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
 
-// ADMINS
-export const initCommand = new SlashCommandBuilder()
-  .setName('init')
-  .setDescription('Initializes data for a specified user')
-  .addUserOption((option) =>
-    option
-      .setName('user')
-      .setDescription('The user to initialize')
-      .setRequired(true)
-  );
-
 //REGULAR
 export const goldCommand = new SlashCommandBuilder()
   .setName('gold')
@@ -30,3 +19,11 @@ export const duelCommand = new SlashCommandBuilder()
 export const statsCommand = new SlashCommandBuilder()
   .setName('stats')
   .setDescription('View your stats');
+
+export const leaderboardCommand = new SlashCommandBuilder()
+  .setName('leaderboard')
+  .setDescription('View the leaderboard');
+
+export const testCommand = new SlashCommandBuilder()
+  .setName('test')
+  .setDescription('test');

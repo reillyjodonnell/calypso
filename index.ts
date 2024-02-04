@@ -3,12 +3,10 @@ import {
   Routes,
   Client,
   GatewayIntentBits,
-  EmbedBuilder,
   InteractionType,
   ActionRowBuilder,
   TextInputStyle,
   PermissionFlagsBits,
-  Partials,
 } from 'discord.js';
 import { DuelService } from './src/duel/DuelService';
 import { DiscordService } from './src/discord/DiscordService';
@@ -18,10 +16,10 @@ import {
   statsCommand,
   goldCommand,
   inventoryCommand,
-  initCommand,
-} from './src/commands';
+  testCommand,
+  leaderboardCommand,
+} from './src/commands/slashCommands';
 import { parseButtonId } from './src/buttons';
-import { createStoreEmbed } from './src/store';
 import { createClient } from 'redis';
 import { GoldRepository } from './src/gold/GoldRepository';
 import { RedisClientType } from '@redis/client';
@@ -51,6 +49,11 @@ import { UserService } from './src/user/UserService';
 import { InventoryService } from './src/inventory/InventoryService';
 import { WeaponRepository } from './src/weapon/WeaponRepository';
 import { createStatsEmbed } from './src/duel/DuelStatsEmbed';
+import { getLeaderboardEmbed } from './src/leaderboard/LeaderboardEmbed';
+import { LeaderboardRepository } from './src/leaderboard/LeaderboardRepository';
+import cron from 'node-cron';
+import { LeaderboardApplicationService } from './src/leaderboard/LeaderboardApplicationService';
+import { LeaderboardService } from './src/leaderboard/LeaderboardService';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -81,8 +84,10 @@ const wagerManager = new WagerManager(wagerRepository);
 
 const duelRepository = new DuelRepository(redisClient);
 const playerRepository = new PlayerRepository(redisClient);
-
+const inventoryRepository = new InventoryRepository(redisClient);
 const weaponRepository = new WeaponRepository(redisClient);
+
+const leaderboardRepository = new LeaderboardRepository(redisClient);
 
 // Clean up
 const duelCleanup = new DuelCleanup(
@@ -95,13 +100,30 @@ const discordService = new DiscordService();
 const duelService = new DuelService();
 const wagerService = new WagerService(goldManager, wagerManager, duelService);
 
+const storeRepository = new StoreRepository();
+const storeInteractionHandler = new StoreInteractionHandler(
+  goldRepository,
+  inventoryRepository,
+  storeRepository
+);
+
+const userService = new UserService(inventoryRepository, storeRepository);
+const inventoryService = new InventoryService(inventoryRepository);
+
+// Leaderboard
+const leaderboardService = new LeaderboardService(leaderboardRepository);
+const leaderBoardApplicationService = new LeaderboardApplicationService(
+  leaderboardService,
+  goldManager
+);
+
 const duelWinManager = new DuelWinManager(
   duelService,
   wagerService,
   goldManager,
-  discordService
+  discordService,
+  leaderBoardApplicationService
 );
-const inventoryRepository = new InventoryRepository(redisClient);
 
 const dualInteractionHandler = new DuelInteractionHandler(
   duelRepository,
@@ -113,15 +135,6 @@ const dualInteractionHandler = new DuelInteractionHandler(
   inventoryRepository,
   weaponRepository
 );
-const storeRepository = new StoreRepository();
-const storeInteractionHandler = new StoreInteractionHandler(
-  goldRepository,
-  inventoryRepository,
-  storeRepository
-);
-
-const userService = new UserService(inventoryRepository, storeRepository);
-const inventoryService = new InventoryService(inventoryRepository);
 
 try {
   await rest.put(Routes.applicationCommands(CLIENT_ID), {
@@ -130,7 +143,8 @@ try {
       statsCommand,
       goldCommand,
       inventoryCommand,
-      initCommand,
+      testCommand,
+      leaderboardCommand,
     ],
   });
 } catch (error) {
@@ -141,25 +155,15 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
 
+cron.schedule('0 0 * * *', async () => {
+  await leaderBoardApplicationService.processLeaderboardReset(client);
+});
+
 client.on('ready', async () => {
   console.log(`Logged in as ${client.user?.tag}!`);
 
-  const guildId = process.env.GUILD_ID;
-  if (!guildId) {
-    console.error('GUILD_ID not found in .env');
-    return;
-  }
   // Replace 'YOUR_GUILD_ID' with the actual ID of your guild (server)
-  let guild = client.guilds.cache.get(guildId);
-  if (!guild) {
-    // make a request to discord
-    guild = await client.guilds.fetch(guildId);
-  }
-
-  if (!guild) {
-    console.error('No guild from discord! Be sure the GUILD_ID is right!');
-    return;
-  }
+  const guild = await discordService.getGuild(client);
 
   const botMember = guild.members.cache.get(process.env.CALYPSO_ID as string);
 
@@ -465,28 +469,11 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   switch (interaction.commandName) {
-    case 'init': {
-      if (!interaction?.memberPermissions?.has('Administrator')) {
-        await interaction.reply({
-          ephemeral: true,
-          content: 'Sorry, you do not have the necessary permissions.',
-        });
-        return;
-      }
-
-      const user = interaction.options.getUser('user');
-      if (!user) {
-        await interaction.reply('User not found.');
-        return;
-      }
-      await userService.initializeUser(user.id);
-      await interaction.reply({
-        content: `Initialized user with id: ${user.id}`,
-        ephemeral: true,
-      });
-
+    case 'test': {
+      await leaderBoardApplicationService.processLeaderboardReset(client);
       break;
     }
+
     case 'inventory': {
       const itemIds = await inventoryRepository.getItems(interaction.user.id);
       const activeItemId = await inventoryRepository.getActiveWeapon(
@@ -575,6 +562,11 @@ client.on('interactionCreate', async (interaction) => {
       );
 
       await interaction.reply({ embeds: [statsEmbed], ephemeral: true });
+      break;
+    }
+
+    case 'leaderboard': {
+      await leaderBoardApplicationService.replyWithTop10(interaction);
       break;
     }
 

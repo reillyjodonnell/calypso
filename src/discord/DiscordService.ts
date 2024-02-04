@@ -19,6 +19,17 @@ import { Weapon } from '../item/weapon';
 const DUEL_CHANNEL_NAME = 'duels';
 
 export class DiscordService {
+  async getGuild(client: Client) {
+    const guildId = process.env.GUILD_ID;
+    if (!guildId) throw new Error('No guild id in .env');
+    let guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+      guild = await client.guilds.fetch(guildId);
+
+      throw new Error('Guild not found');
+    }
+    return guild;
+  }
   async initializeServer(guild: Guild | null, weapons: Weapon[]) {
     if (!guild) return console.log('Guild not found');
 
