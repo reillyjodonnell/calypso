@@ -16,7 +16,6 @@ import {
   statsCommand,
   goldCommand,
   inventoryCommand,
-  testCommand,
   leaderboardCommand,
 } from './src/commands/slashCommands';
 import { parseButtonId } from './src/buttons';
@@ -54,6 +53,7 @@ import { LeaderboardRepository } from './src/leaderboard/LeaderboardRepository';
 import cron from 'node-cron';
 import { LeaderboardApplicationService } from './src/leaderboard/LeaderboardApplicationService';
 import { LeaderboardService } from './src/leaderboard/LeaderboardService';
+import { serverRulesEmbed } from './src/discord/ServerRules';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -143,7 +143,6 @@ try {
       statsCommand,
       goldCommand,
       inventoryCommand,
-      testCommand,
       leaderboardCommand,
     ],
   });
@@ -469,8 +468,7 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   switch (interaction.commandName) {
-    case 'test': {
-      await leaderBoardApplicationService.processLeaderboardReset(client);
+    case 'init': {
       break;
     }
 

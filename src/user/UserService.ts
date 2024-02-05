@@ -14,9 +14,12 @@ export class UserService {
       return;
     }
     // equip the basic sword
-    basicSword.setEquipped(true);
-    this.inventoryRepository.awardItem(playerId, basicSword);
-    console.log('Initializing user with id:', playerId);
+    await this.inventoryRepository.awardItem(playerId, basicSword);
+    await this.inventoryRepository.saveItem(playerId, {
+      equipped: true,
+      id: idOfBasicSword,
+      quantity: 1,
+    });
   }
   retrieveActiveWeapon(playerId: string) {
     return this.inventoryRepository.getActiveWeapon(playerId);

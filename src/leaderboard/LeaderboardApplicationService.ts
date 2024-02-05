@@ -104,8 +104,18 @@ export class LeaderboardApplicationService {
   }
 
   async processLeaderboardReset(client: Client) {
-    const guild = await this.discordService.getGuild(client);
     const result = await this.leaderboardService.getTop10();
+
+    const guild = await this.discordService.getGuild(client);
+    if (!guild) {
+      console.error('Guild not found');
+      return;
+    }
+    if (!result) {
+      console.error('No one is on the leaderboard yet!');
+      return;
+    }
+
     let formattedWithName: { value: string; score: number }[] = [];
     for (const player of result) {
       const user = guild.members.cache.get(player.value);
@@ -121,7 +131,14 @@ export class LeaderboardApplicationService {
         });
       }
     }
+
     const embed = getLeaderboardEmbed(formattedWithName);
+
+    // make sure we have at least 3 people on the leaderboard
+    if (result.length < 3) {
+      console.error('Not enough people on the leaderboard');
+      return;
+    }
 
     const firstPlace = result[0].value;
     const secondPlace = result[1].value;

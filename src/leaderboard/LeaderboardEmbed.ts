@@ -33,11 +33,13 @@ export function getLeaderboardEmbed(data: LeaderboardData) {
       '👑 Behold the champions of the arena! Who shall claim the throne today? 👑'
     )
     .addFields(
-      data.map((player, index) => ({
-        name: `${player.value}`,
-        value: `🏅 Duels Won: ${player.score}`,
-        inline: false,
-      }))
+      data.map((player) => {
+        return {
+          name: `${player.value}`,
+          value: `🏅 Duels Won: ${player.score}`,
+          inline: false,
+        };
+      })
     )
     .setThumbnail(
       'https://raw.githubusercontent.com/reillyjodonnell/ares/fd54b6937bb36d69c0c8588d27bbf0c9987d1baa/avatar.png' // Consider updating for more dynamic engagement

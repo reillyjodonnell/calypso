@@ -69,6 +69,21 @@ export class InventoryRepository {
     return items.find((item) => item.equipped);
   }
 
+  async saveItems(
+    playerId: string,
+    updatedItems: InventoryItem[]
+  ): Promise<void> {
+    const inventoryKey = `user:${playerId}:inventory`;
+    const pipeline = this.redisClient.multi();
+
+    updatedItems.forEach((item) => {
+      pipeline.hSet(inventoryKey, item.id, JSON.stringify(item));
+    });
+
+    // Execute all commands in the pipeline
+    await pipeline.exec();
+  }
+
   async saveItem(playerId: string, updatedItem: InventoryItem): Promise<void> {
     const inventoryKey = `user:${playerId}:inventory`;
     await this.redisClient.hSet(

@@ -23,7 +23,3 @@ export const statsCommand = new SlashCommandBuilder()
 export const leaderboardCommand = new SlashCommandBuilder()
   .setName('leaderboard')
   .setDescription('View the leaderboard');
-
-export const testCommand = new SlashCommandBuilder()
-  .setName('test')
-  .setDescription('test');
