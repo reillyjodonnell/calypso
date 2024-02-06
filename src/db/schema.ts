@@ -19,7 +19,7 @@ export type SelectUsers = InferSelectModel<typeof users>;
 export type InsertUsers = InferInsertModel<typeof users>;
 
 export const weapons = sqliteTable('weapons', {
-  id: text('id').primaryKey(), //discord_id
+  id: text('id').primaryKey(),
   name: text('weapon_name').notNull(),
   damage: text('weapon_damage').notNull(),
   price: integer('price').notNull(),

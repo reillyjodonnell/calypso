@@ -5,6 +5,7 @@ import { Player } from '../player/player';
 import { WagerService } from '../wager/WagerService';
 import { DuelService } from './DuelService';
 import { LeaderboardApplicationService } from '../leaderboard/LeaderboardApplicationService';
+import { DuelSQLRepository } from './DuelSQLRepository';
 
 const GOLD_AMOUNT_FOR_WIN = 5;
 
@@ -14,7 +15,8 @@ export class DuelWinManager {
     private wagerService: WagerService,
     private goldManager: GoldManager,
     private discordService: DiscordService,
-    private leaderboardApplicationService: LeaderboardApplicationService
+    private leaderboardApplicationService: LeaderboardApplicationService,
+    private duelSQLRepository: DuelSQLRepository
   ) {}
 
   async handleWin(
@@ -24,7 +26,7 @@ export class DuelWinManager {
     try {
       const { winnerId } = this.duelService.determineWinner(players);
       if (winnerId) {
-        // give the winner 2 gold for winning
+        // give the winner 5 gold for winning
         await this.goldManager.awardGold(winnerId, GOLD_AMOUNT_FOR_WIN);
         // Handling the wagers
         const settledWagers = await this.wagerService.settleWagers({
@@ -38,6 +40,12 @@ export class DuelWinManager {
         );
 
         this.leaderboardApplicationService.recordWin(winnerId);
+
+        await this.duelSQLRepository.putUsers({
+          id: winnerId, // Assuming winnerId is the user's ID
+          gamesWon: 1, // Assuming you want to increment gamesWon for the winner
+          gamesLost: 0, // Assuming you want to keep track of gamesLost (set to 0 for the winner)
+        });
 
         return wagerResultsEmbed;
       }
