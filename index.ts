@@ -13,7 +13,6 @@ import { DiscordService } from './src/discord/DiscordService';
 import { DuelRepository } from './src/duel/DuelRepository';
 import {
   duelCommand,
-  statsCommand,
   goldCommand,
   inventoryCommand,
   leaderboardCommand,
@@ -48,12 +47,10 @@ import { UserService } from './src/user/UserService';
 import { InventoryService } from './src/inventory/InventoryService';
 import { WeaponRepository } from './src/weapon/WeaponRepository';
 import { createStatsEmbed } from './src/duel/DuelStatsEmbed';
-import { getLeaderboardEmbed } from './src/leaderboard/LeaderboardEmbed';
 import { LeaderboardRepository } from './src/leaderboard/LeaderboardRepository';
 import cron from 'node-cron';
 import { LeaderboardApplicationService } from './src/leaderboard/LeaderboardApplicationService';
 import { LeaderboardService } from './src/leaderboard/LeaderboardService';
-import { serverRulesEmbed } from './src/discord/ServerRules';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -138,13 +135,7 @@ const dualInteractionHandler = new DuelInteractionHandler(
 
 try {
   await rest.put(Routes.applicationCommands(CLIENT_ID), {
-    body: [
-      duelCommand,
-      statsCommand,
-      goldCommand,
-      inventoryCommand,
-      leaderboardCommand,
-    ],
+    body: [duelCommand, goldCommand, inventoryCommand, leaderboardCommand],
   });
 } catch (error) {
   console.error(error);
@@ -389,6 +380,56 @@ client.on('interactionCreate', async (interaction) => {
         );
         break;
       }
+      case 'stats': {
+        // make sure they're saying it from the duel thread
+        const duelThread = await discordService.findDuelThread(
+          interaction.guild,
+          interaction?.channelId
+        );
+        if (!duelThread) {
+          await interaction.reply({
+            content: 'This command can only be used in a duel!.',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const player = await playerRepository.getById(
+          duelThread.id,
+          interaction.user.id
+        );
+        if (!player) {
+          await interaction.reply({
+            content: 'Player not found.',
+            ephemeral: true,
+          });
+          return;
+        }
+        const activeWeapon = await inventoryRepository.getActiveWeapon(
+          interaction.user.id
+        );
+        const weapon = activeWeapon
+          ? await weaponRepository.getWeapon(activeWeapon.id)
+          : null;
+
+        if (!weapon) {
+          await interaction.reply({
+            content: 'No weapon found.',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const statsEmbed = createStatsEmbed(
+          interaction.user.displayName,
+          player,
+          weapon
+        );
+
+        await interaction.reply({ embeds: [statsEmbed], ephemeral: true });
+
+        break;
+      }
     }
     const storeAction = interaction.customId;
     // inventory
@@ -507,59 +548,6 @@ client.on('interactionCreate', async (interaction) => {
         components: [...(res.components as any)],
         ephemeral: true,
       });
-      break;
-    }
-    case 'buy': {
-      break;
-    }
-
-    case 'stats': {
-      // make sure they're saying it from the duel thread
-      const duelThread = await discordService.findDuelThread(
-        interaction.guild,
-        interaction?.channelId
-      );
-      if (!duelThread) {
-        await interaction.reply({
-          content: 'This command can only be used in a duel!.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const player = await playerRepository.getById(
-        duelThread.id,
-        interaction.user.id
-      );
-      if (!player) {
-        await interaction.reply({
-          content: 'Player not found.',
-          ephemeral: true,
-        });
-        return;
-      }
-      const activeWeapon = await inventoryRepository.getActiveWeapon(
-        interaction.user.id
-      );
-      const weapon = activeWeapon
-        ? await weaponRepository.getWeapon(activeWeapon.id)
-        : null;
-
-      if (!weapon) {
-        await interaction.reply({
-          content: 'No weapon found.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const statsEmbed = createStatsEmbed(
-        interaction.user.displayName,
-        player,
-        weapon
-      );
-
-      await interaction.reply({ embeds: [statsEmbed], ephemeral: true });
       break;
     }
 

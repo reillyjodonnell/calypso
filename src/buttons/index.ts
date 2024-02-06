@@ -35,9 +35,9 @@ export function getAllButtonOptions({
     }),
     false
   );
-  const leaveButton = createLeaveButton(
+  const statsButton = createStatsButton(
     createButtonId({
-      action: 'leave',
+      action: 'stats',
       guildId: guildId,
       threadId: channelId,
       counter: leaveId,
@@ -47,7 +47,7 @@ export function getAllButtonOptions({
   const row = new ActionRowBuilder().addComponents(
     attackButton,
     healButton,
-    leaveButton
+    statsButton
   );
   return row;
 }
@@ -115,6 +115,15 @@ export function createHealButton(id: string, isDisabled: boolean) {
     .setLabel('Heal')
     .setStyle(ButtonStyle.Success) // Green color for heal
     .setEmoji('❤️')
+    .setDisabled(isDisabled);
+}
+
+export function createStatsButton(id: string, isDisabled: boolean) {
+  return new ButtonBuilder()
+    .setCustomId(id)
+    .setLabel('Stats')
+    .setStyle(ButtonStyle.Secondary) // Gray color for stats
+    .setEmoji('📊')
     .setDisabled(isDisabled);
 }
 export function createLeaveButton(id: string, isDisabled: boolean) {

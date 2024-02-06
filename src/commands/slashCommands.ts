@@ -16,10 +16,6 @@ export const duelCommand = new SlashCommandBuilder()
     option.setName('user').setDescription('The user to duel').setRequired(true)
   );
 
-export const statsCommand = new SlashCommandBuilder()
-  .setName('stats')
-  .setDescription('View your stats');
-
 export const leaderboardCommand = new SlashCommandBuilder()
   .setName('leaderboard')
   .setDescription('View the leaderboard');

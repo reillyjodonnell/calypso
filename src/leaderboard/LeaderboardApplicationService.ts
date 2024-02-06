@@ -149,9 +149,15 @@ export class LeaderboardApplicationService {
     const secondPlaceReward = 10;
     const thirdPlaceReward = 5;
 
-    const todayDate = new Date().toLocaleDateString('en-US');
+    // get yesterday's date
+
+    const yesterdayDate = new Date(
+      new Date().setDate(new Date().getDate() - 1)
+    ).toLocaleDateString('en-US');
+
+    // minus one day
     const rewardsMessage =
-      `🏆 **Duel Arena Leaderboard Update - ${todayDate}!** 🏆\n\n` +
+      `🏆 **Duel Arena Leaderboard Update - ${yesterdayDate}!** 🏆\n\n` +
       `The epic battles have concluded, and the champions of the arena have emerged! Here are our top gladiators:\n\n` +
       `🥇 **1st Place**: <@${firstPlace}> with an impressive ${result[0].score} wins! Awarded ${firstPlaceReward} gold! 🌟\n` +
       `🥈 **2nd Place**: <@${secondPlace}> with a strong ${result[1].score} wins! Awarded ${secondPlaceReward} gold! 💫\n` +

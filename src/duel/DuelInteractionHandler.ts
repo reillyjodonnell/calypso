@@ -580,7 +580,7 @@ export class DuelInteractionHandler {
       });
 
       await interaction.reply({
-        content: `You rolled a ${roll} and healed ${roll} health! You have ${healthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`,
+        content: `<@${interaction.user.id}> rolled a ${roll} and healed ${roll} health! You have ${healthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`,
         components: [row as any],
       });
     }
@@ -655,7 +655,7 @@ export class DuelInteractionHandler {
       );
       const row = new ActionRowBuilder().addComponents(rollButton);
       await interaction.reply({
-        content: `You rolled a ${roll}. Critical hit! Damage is doubled. Roll for damage below!`,
+        content: `<@${interaction.user.id}> rolled a ${roll}. Critical hit! Damage is doubled. Roll for damage below!`,
         components: [row as any],
       });
       return;
@@ -710,19 +710,19 @@ export class DuelInteractionHandler {
       switch (status) {
         case SELF_HARM:
           await interaction.reply({
-            content: `You swing at your target, but miss and hit yourself for ${damage} damage! You have ${healthRemaining} health remaining.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`,
+            content: `You rolled a ${roll}! You swing at your target, but miss and hit yourself for ${damage} damage! You have ${healthRemaining} health remaining.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`,
             components: [row as any],
           });
           break;
         case NO_EFFECT:
           await interaction.reply({
-            content: `You swing at your target and miss terribly. Somehow you recovered!\n\n<@${nextPlayerId}> it's your turn!`,
+            content: `You rolled a ${roll}! You swing at your target and miss terribly. Somehow you recovered!\n\n<@${nextPlayerId}> it's your turn!`,
             components: [row as any],
           });
           break;
         case FALL_DOWN:
           await interaction.reply({
-            content: `You swing at your target and miss terribly. You fall down and lose your turn!\n\n<@${nextPlayerId}> it's your turn!`,
+            content: `You rolled a ${roll}! You swing at your target and miss terribly. You fall down and lose your turn!\n\n<@${nextPlayerId}> it's your turn!`,
             components: [row as any],
           });
           break;
@@ -743,7 +743,7 @@ export class DuelInteractionHandler {
       );
       const row = new ActionRowBuilder().addComponents(rollButton);
       await interaction.reply({
-        content: `You rolled a ${roll} and hit! Roll for damage below!`,
+        content: `<@${interaction.user.id}> rolled a ${roll} and hit! Roll for damage below!`,
         components: [row as any],
       });
       return;
@@ -758,7 +758,7 @@ export class DuelInteractionHandler {
     });
 
     await interaction.reply({
-      content: `You rolled a ${roll} and missed! :(\n\n<@${nextPlayerId}> it's your turn!`,
+      content: `<@${interaction.user.id}> rolled a ${roll} and missed! :(\n\n<@${nextPlayerId}> it's your turn!`,
       components: [row as any],
     });
   }
@@ -871,7 +871,7 @@ export class DuelInteractionHandler {
         leaveId: this.duelService.getCounter(),
       });
       await interaction.reply({
-        content: `You rolled a ${roll} ${
+        content: `<@${interaction.user.id}> rolled a ${roll} ${
           criticalHit ? `and a ${criticalHitRoll} ` : ''
         } and dealt ${
           roll! + (criticalHit ? criticalHitRoll! : 0)
@@ -889,7 +889,7 @@ export class DuelInteractionHandler {
         leaveId: this.duelService.getCounter(),
       });
       await interaction.reply({
-        content: `You rolled a ${roll} ${
+        content: `<@${interaction.user.id}> rolled a ${roll} ${
           criticalHit ? `and a ${criticalHitRoll} ` : ''
         } and dealt ${
           roll! + (criticalHit ? criticalHitRoll! : 0)
@@ -900,7 +900,7 @@ export class DuelInteractionHandler {
     }
     if (status === 'TARGET_DEAD' && winnerId) {
       await interaction.reply(
-        `You rolled a ${roll} ${
+        `<@${interaction.user.id}> rolled a ${roll} ${
           criticalHit ? `and a ${criticalHitRoll} ` : ''
         } and dealt ${
           roll! + (criticalHit ? criticalHitRoll! : 0)
@@ -920,7 +920,6 @@ export class DuelInteractionHandler {
         await interaction.followUp({ embeds: [wagerResults] });
       }
       await this.duelCleanup.remove(duelThread.id, duel);
-      // create a
       return;
     }
   }

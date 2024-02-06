@@ -86,3 +86,73 @@ export const simpleWeapons = [
   simpleBow,
   woodenStaff,
 ];
+
+const smokeBomb = {
+  id: '6',
+  emoji: '💨',
+  name: 'Smoke Bomb',
+  type: 'utility',
+  rarity: 'uncommon',
+  description:
+    'Gives a chance that the opponent misses their next attack. Opponent unaware of usage.',
+  effect: 'missChanceIncrease',
+  effectChance: 0.25,
+  price: 15,
+};
+
+const mirrorShield = {
+  id: '7',
+  emoji: '🛡️',
+  name: 'Mirror Shield',
+  type: 'defensive',
+  rarity: 'rare',
+  description:
+    'Reflects a small percentage of the opponent’s attack back at them.',
+  reflectPercentage: 0.1,
+  price: 30,
+};
+
+const riskyPotion = {
+  id: '8',
+  emoji: '🧪',
+  name: 'Risky Potion',
+  type: 'consumable',
+  rarity: 'uncommon',
+  description: 'Heals significantly or deals minor damage. It’s a gamble!',
+  effect: 'randomHealOrDamage',
+  healAmount: 20,
+  damageAmount: 5,
+  price: 25,
+};
+
+const healersHerb = {
+  id: '13',
+  emoji: '🌿',
+  name: "Healer's Herb",
+  type: 'healing',
+  rarity: 'common',
+  description: 'Restores health gradually over a few turns.',
+  healingPerTurn: 3,
+  duration: 4,
+  price: 15,
+};
+
+const suddenStrike = {
+  id: '15',
+  emoji: '⚡',
+  name: 'Sudden Strike',
+  type: 'offensive',
+  rarity: 'uncommon',
+  description: 'Attack twice in one turn with reduced damage.',
+  effect: 'doubleAttackReducedDamage',
+  damageReduction: 0.5,
+  price: 30,
+};
+
+export const specialItems = {
+  smokeBomb,
+  mirrorShield,
+  riskyPotion,
+  healersHerb,
+  suddenStrike,
+};
