@@ -9,7 +9,13 @@ export class Duel {
   // key is the users id
   private participants: Map<
     string,
-    { playerId: string; role: Role; isReady: boolean; rolledInitative: number }
+    {
+      playerId: string;
+      role: Role;
+      isReady: boolean;
+      rolledInitative: number;
+      hasUsedItem: boolean;
+    }
   > = new Map();
   private turnNumber = 0;
   private currentTurn = 0;
@@ -54,7 +60,21 @@ export class Duel {
       role,
       isReady: false,
       rolledInitative: 0,
+      hasUsedItem: false,
     });
+  }
+
+  public hasPlayerUsedItem(playerId: string) {
+    return this.participants.get(playerId)?.hasUsedItem;
+  }
+
+  public setPlayerUsedItem(playerId: string) {
+    const playerInfo = this.participants.get(playerId);
+    if (!playerInfo) {
+      throw new Error('Player not found');
+    }
+    playerInfo.hasUsedItem = true;
+    this.participants.set(playerId, playerInfo);
   }
 
   public hasPlayerRolledForInitiative(playerId: string) {

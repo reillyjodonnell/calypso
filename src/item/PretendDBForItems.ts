@@ -52,7 +52,7 @@ const simpleBow = {
   name: 'Simple Bow',
   type: 'ranged',
   rarity: 'common',
-  description: 'Deals 2d4 damage with a +1 to hit. High crit fail chance',
+  description: 'Deals 1d6 damage with a +1 to hit. High crit fail chance',
   damage: '1d6',
   rollToHit: '1d20 + 1',
   critHit: [20],
@@ -96,7 +96,6 @@ const smokeBomb = {
   description:
     'Gives a chance that the opponent misses their next attack. Opponent unaware of usage.',
   effect: 'missChanceIncrease',
-  effectChance: 0.25,
   price: 15,
 };
 
@@ -107,8 +106,8 @@ const mirrorShield = {
   type: 'defensive',
   rarity: 'rare',
   description:
-    'Reflects a small percentage of the opponent’s attack back at them.',
-  reflectPercentage: 0.1,
+    'Reflects a random percentage of the opponent’s attack back at them.',
+  effect: 'reflectDamage',
   price: 30,
 };
 
@@ -120,8 +119,8 @@ const riskyPotion = {
   rarity: 'uncommon',
   description: 'Heals significantly or deals minor damage. It’s a gamble!',
   effect: 'randomHealOrDamage',
-  healAmount: 20,
-  damageAmount: 5,
+  maxHealAmount: 20,
+  maxDamageAmount: 5,
   price: 25,
 };
 
@@ -132,6 +131,7 @@ const healersHerb = {
   type: 'healing',
   rarity: 'common',
   description: 'Restores health gradually over a few turns.',
+  effect: 'healingPerTurn',
   healingPerTurn: 3,
   duration: 4,
   price: 15,

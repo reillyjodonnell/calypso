@@ -14,8 +14,8 @@ import {
   enterArenaButtonComponent,
   startHereEmbed,
 } from '../startHere/startHereEmbed';
-import { createStoreEmbed } from '../store';
 import { Weapon } from '../item/weapon';
+import { createStoreEmbed } from '../store/StoreEmbed';
 const DUEL_CHANNEL_NAME = 'duels';
 
 export class DiscordService {

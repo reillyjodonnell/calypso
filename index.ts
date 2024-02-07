@@ -8,7 +8,7 @@ import {
   TextInputStyle,
   PermissionFlagsBits,
 } from 'discord.js';
-import { DuelService } from './src/duel/DuelService';
+import { DUEL_NOT_FOUND, DuelService } from './src/duel/DuelService';
 import { DiscordService } from './src/discord/DiscordService';
 import { DuelRepository } from './src/duel/DuelRepository';
 import {
@@ -51,6 +51,7 @@ import { LeaderboardRepository } from './src/leaderboard/LeaderboardRepository';
 import cron from 'node-cron';
 import { LeaderboardApplicationService } from './src/leaderboard/LeaderboardApplicationService';
 import { LeaderboardService } from './src/leaderboard/LeaderboardService';
+import { parseItemsButtonId } from './src/item/ItemsEmbed';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -431,10 +432,79 @@ client.on('interactionCreate', async (interaction) => {
         break;
       }
     }
-    const storeAction = interaction.customId;
+
+    if (interaction.customId.startsWith('item')) {
+      // using an item in the duel
+      const { action, itemId, playerId } = parseItemsButtonId(
+        interaction.customId
+      );
+
+      if (action !== 'item') {
+        console.error('Caught in the wrong action for item');
+        return;
+      }
+
+      const res = await inventoryRepository.getItem(playerId, itemId);
+      if (!res) {
+        await interaction.reply({
+          content: 'Item not found.',
+          ephemeral: true,
+        });
+        return;
+      }
+      const { id } = res;
+
+      const duel = await duelRepository.getById(threadId);
+
+      // make sure they haven't used in an item in a duel yet
+      const canUseItem = await duelService.canUseItem({ duel, playerId });
+
+      if (
+        typeof canUseItem !== 'boolean' &&
+        canUseItem.status === DUEL_NOT_FOUND
+      ) {
+        await interaction.reply({
+          content: 'Duel not found.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      if (typeof canUseItem === 'boolean' && !canUseItem) {
+        await interaction.reply({
+          content: 'You have already used an item this duel.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      if (!duel?.getId()) {
+        await interaction.reply({
+          content: 'Duel not found.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const player = await playerRepository.getById(duel.getId(), playerId);
+
+      // use the item
+      await duelService.useItem({ duel, player, itemId: id });
+
+      // this should lower the quantity by 1
+      // apply the effect of the item
+      // send a message saying the item was used
+      await interaction.reply({
+        content: 'Item used',
+        ephemeral: true,
+      });
+    }
+
     // inventory
-    if (storeAction.startsWith('use')) {
-      const { action, itemId, playerId } = parseInventoryButtonId(storeAction);
+    if (interaction.customId.startsWith('inventory')) {
+      const { action, itemId, playerId } = parseInventoryButtonId(
+        interaction.customId
+      );
       const res = await inventoryRepository.getItem(playerId, itemId);
       if (!res) {
         await interaction.reply({
@@ -471,7 +541,7 @@ client.on('interactionCreate', async (interaction) => {
       }
     }
 
-    switch (storeAction) {
+    switch (interaction.customId) {
       // STORE
       case 'buy_1': {
         await storeInteractionHandler.handleStorePurchase(interaction, '1');
@@ -501,8 +571,6 @@ client.on('interactionCreate', async (interaction) => {
         await storeInteractionHandler.handleStorePurchase(interaction, '7');
         break;
       }
-
-      // equipment
     }
   }
 

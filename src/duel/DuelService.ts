@@ -1,4 +1,4 @@
-import { parseDieAndRoll } from '../dice/dice';
+import { getRollsWithModifiers, parseDieAndRoll } from '../dice/dice';
 import { Weapon } from '../item/weapon';
 import { Player } from '../player/player';
 import { RandomEventsGenerator } from '../randomEvents/RandomEventsGenerator';
@@ -232,10 +232,6 @@ export class DuelService {
 
     const doesHitTarget = roll >= defender.getAC();
 
-    console.log(
-      `${attacker.getId()} rolled a ${roll}. Attack crits are ${attacker.getCriticalHit()}\n`
-    );
-
     if (doesHitTarget) {
       attacker.setTargetId(defender.getId());
 
@@ -336,9 +332,10 @@ export class DuelService {
       | typeof TARGET_DEAD
       | typeof TARGET_HIT;
     targetHealthRemaining?: number;
-    roll?: number;
-    criticalHitRoll?: number;
+    rolls?: number[];
+    damage?: number;
     nextPlayerId?: string;
+    modifier?: number;
   } {
     if (!duel) {
       return {
@@ -352,11 +349,17 @@ export class DuelService {
       };
     }
 
-    const roll = parseDieAndRoll(sidedDie);
-    const criticalHitRoll = parseDieAndRoll(sidedDie);
+    if (!sidedDie) {
+      throw new Error('sidedDie is null');
+    }
+
+    const { rolls, total, modifier } = getRollsWithModifiers(
+      sidedDie,
+      criticalHit
+    );
 
     // attack the target
-    defender.hurt(roll + (criticalHit ? criticalHitRoll : 0));
+    defender.hurt(total);
     const isTargetDead = defender.isPlayerDead();
     const targetHealthRemaining = defender.getHealth();
     attacker.clearTarget();
@@ -369,18 +372,20 @@ export class DuelService {
       return {
         status: 'TARGET_DEAD',
         targetHealthRemaining,
-        roll,
-        criticalHitRoll: criticalHit ? criticalHitRoll : undefined,
+        rolls,
+        damage: total,
         nextPlayerId,
+        modifier,
       };
     }
 
     return {
       status: 'TARGET_HIT',
       targetHealthRemaining,
-      roll,
-      criticalHitRoll: criticalHit ? criticalHitRoll : undefined,
+      rolls,
+      damage: total,
       nextPlayerId,
+      modifier,
     };
   }
 
@@ -446,6 +451,55 @@ export class DuelService {
     };
   }
 
+  async useItem({
+    duel,
+    player,
+    itemId,
+  }: {
+    duel: Duel | null;
+    player: Player | null;
+    itemId: string;
+  }): Promise<{
+    status: typeof DUEL_NOT_FOUND | 'ITEM_USED' | 'PLAYER_NOT_FOUND';
+    player?: Player;
+    duel?: Duel;
+  }> {
+    if (!duel) {
+      return {
+        status: DUEL_NOT_FOUND,
+      };
+    }
+
+    if (!player) {
+      return {
+        status: 'PLAYER_NOT_FOUND',
+      };
+    }
+
+    duel.setPlayerUsedItem(player.getId());
+
+    duel.nextTurn();
+
+    return {
+      status: 'ITEM_USED',
+      player,
+      duel,
+    };
+  }
+
+  canUseItem({ duel, playerId }: { duel: Duel | null; playerId: string }) {
+    if (!duel) {
+      return {
+        status: DUEL_NOT_FOUND,
+      };
+    }
+
+    // make sure the player has the item and hasn't used an item this match
+    const hasUsedItem = duel.hasPlayerUsedItem(playerId);
+
+    return !hasUsedItem;
+  }
+
   determineWinner(players: Player[]): { winnerId: string | null } {
     // Filter out players who are still alive
     const alivePlayers = players.filter((player) => !player.isPlayerDead());
@@ -463,5 +517,12 @@ export class DuelService {
       throw new Error('Duel not found');
     }
     return duel.hasAnyPlayerRolledForInitiative();
+  }
+
+  getNumberOfDice(sidedDie: string, criticalHit: boolean) {
+    const baseAttackNumberOfDice = parseInt(sidedDie.split('d')[0]);
+
+    // if critical double it otherwise return the base attack
+    return criticalHit ? baseAttackNumberOfDice * 2 : baseAttackNumberOfDice;
   }
 }

@@ -1,7 +1,6 @@
 import { Item } from './Item';
 
 export class Weapon extends Item {
-  private emoji: string;
   private damage: string;
   private rollToHit: string;
   private critHit: number[];
@@ -16,13 +15,13 @@ export class Weapon extends Item {
     type,
     rarity,
     price,
-    emoji,
     damage,
     rollToHit,
     critHit,
     critFail,
     critChance,
     critFailChance,
+    emoji,
   }: {
     id: string;
     name: string;
@@ -30,16 +29,15 @@ export class Weapon extends Item {
     type: string;
     rarity: string;
     price: number;
-    emoji: string;
     damage: string;
     rollToHit: string;
     critHit: number[];
     critFail: number[];
     critChance: number;
     critFailChance: number;
+    emoji: string;
   }) {
-    super(id, name, description, type, rarity, price);
-    this.emoji = emoji;
+    super(id, emoji, name, type, rarity, description, price);
     this.damage = damage;
     this.rollToHit = rollToHit;
     this.critHit = critHit;

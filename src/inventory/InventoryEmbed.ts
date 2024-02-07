@@ -5,10 +5,11 @@ import {
   ButtonStyle,
 } from 'discord.js';
 import { Weapon } from '../item/weapon';
+import { Item } from '../item/Item';
 
 export function createInventoryEmbed(
   playerId: string,
-  inventory: Weapon[] | null,
+  inventory: Weapon[] | Item[] | null,
   equippedWeapon: Weapon | undefined
 ) {
   // return an empty inventory message if the user has no items
@@ -83,7 +84,7 @@ export function createInventoryButtonId({
   if (!itemId) {
     throw new Error('Missing item id');
   }
-  const action = 'use';
+  const action = 'inventory';
 
   const uniqueId = `${action}/${playerId}/${itemId}/${Date.now().toString()}`;
   return uniqueId;

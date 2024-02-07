@@ -22,7 +22,7 @@ def roll_damage(damage_roll):
     if "+" in damage_roll:
         parts = damage_roll.split("+")
         dice_roll = parts[0]
-        fixed_bonus = int(parts[1])
+        fixed_bonus = int(parts[1]) 
         return roll_dice(dice_roll) + fixed_bonus
     else:
         return roll_dice(damage_roll)

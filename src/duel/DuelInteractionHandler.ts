@@ -47,6 +47,7 @@ import {
 import { DuelCleanup } from './DuelCleanup';
 import { InventoryRepository } from '../inventory/InventoryRepository';
 import { WeaponRepository } from '../weapon/WeaponRepository';
+import { test } from 'bun:test';
 
 export class DuelInteractionHandler {
   constructor(
@@ -90,11 +91,6 @@ export class DuelInteractionHandler {
     );
     const challengedWeapon = await this.weaponRepository.getWeapon(
       challengedWeaponRes.id
-    );
-
-    console.log(
-      'crit hit array for challenged player: ',
-      challengedWeapon?.getCritHit()
     );
 
     if (!challengerWeapon || !challengedWeapon) {
@@ -839,10 +835,11 @@ export class DuelInteractionHandler {
 
     const {
       status,
-      roll,
-      criticalHitRoll,
+      rolls,
+      damage,
       targetHealthRemaining,
       nextPlayerId,
+      modifier,
     } = this.duelService.rollFordamage({
       duel,
       attacker,
@@ -861,6 +858,20 @@ export class DuelInteractionHandler {
       await interaction.reply("It's not your turn!");
       return;
     }
+
+    if (!rolls || !modifier) throw new Error('rolls is null');
+
+    const modifierStatement =
+      modifier < 0
+        ? ` with a -${modifier} damage modifier`
+        : modifier > 0
+        ? ` with a +${modifier} damage modifier`
+        : '';
+
+    const formattedRolls = formatCommaSeparatedList(rolls);
+    const rollsWithDamage = `<@${interaction.user.id}> rolled a ${formattedRolls}${modifierStatement} and dealt ${damage} damage!`;
+
+    const nextPlayerPrompt = `<@${nextPlayerId}> it's your turn!`;
     if (status === 'TARGET_HIT') {
       const row = getAllButtonOptions({
         guildId: interaction.guildId,
@@ -870,12 +881,11 @@ export class DuelInteractionHandler {
         healId: this.duelService.getCounter(),
         leaveId: this.duelService.getCounter(),
       });
+
+      // damage is the total damage and rolls are an array of each roll as a number
+
       await interaction.reply({
-        content: `<@${interaction.user.id}> rolled a ${roll} ${
-          criticalHit ? `and a ${criticalHitRoll} ` : ''
-        } and dealt ${
-          roll! + (criticalHit ? criticalHitRoll! : 0)
-        } damage! <@${defender.getId()}> has ${targetHealthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn!`,
+        content: `${rollsWithDamage} <@${defender.getId()}> has ${targetHealthRemaining} health left.\n\n${nextPlayerPrompt}`,
         components: [row as any],
       });
     }
@@ -889,22 +899,14 @@ export class DuelInteractionHandler {
         leaveId: this.duelService.getCounter(),
       });
       await interaction.reply({
-        content: `<@${interaction.user.id}> rolled a ${roll} ${
-          criticalHit ? `and a ${criticalHitRoll} ` : ''
-        } and dealt ${
-          roll! + (criticalHit ? criticalHitRoll! : 0)
-        } damage! You see the light leave their eyes. You killed <@${defender.getId()}>!\n\n<@${nextPlayerId}> it's your turn!`,
+        content: `${rollsWithDamage} You see the light leave their eyes. You killed <@${defender.getId()}>!\n\n${nextPlayerPrompt}`,
         components: [row as any],
       });
       return;
     }
     if (status === 'TARGET_DEAD' && winnerId) {
       await interaction.reply(
-        `<@${interaction.user.id}> rolled a ${roll} ${
-          criticalHit ? `and a ${criticalHitRoll} ` : ''
-        } and dealt ${
-          roll! + (criticalHit ? criticalHitRoll! : 0)
-        } damage! You see the light leave their eyes. You killed <@${defender.getId()}>! <@${winnerId}> wins!`
+        `${rollsWithDamage} You see the light leave their eyes. You killed <@${defender.getId()}>!\n\n <@${winnerId}> wins!`
       );
       //  message user that they won 5 gold
       await interaction.followUp({
@@ -1013,4 +1015,13 @@ export class DuelInteractionHandler {
       });
     }
   }
+}
+
+function formatCommaSeparatedList(arr: number[]): string {
+  if (arr.length === 1) {
+    return arr[0].toString();
+  }
+
+  const lastItem = arr.pop(); // Remove the last item and store it
+  return arr.join(', ') + ', and ' + lastItem;
 }

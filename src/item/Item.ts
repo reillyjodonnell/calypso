@@ -1,94 +1,70 @@
 export class Item {
+  id: string;
+  emoji: string;
+  name: string;
+  type: string;
+  rarity: string;
+  description: string;
+  price: number;
+
   constructor(
-    public id: string,
-    public name: string,
-    public description: string,
-    public type: string,
-    public rarity: string,
-    public price: number
-  ) {}
+    id: string,
+    emoji: string,
+    name: string,
+    type: string,
+    rarity: string,
+    description: string,
+    price: number
+  ) {
+    this.id = id;
+    this.emoji = emoji;
+    this.name = name;
+    this.type = type;
+    this.rarity = rarity;
+    this.description = description;
+    this.price = price;
+  }
+
+  getId() {
+    return this.id;
+  }
+  setId(id: string) {
+    this.id = id;
+  }
+  getEmoji() {
+    return this.emoji;
+  }
+  setEmoji(emoji: string) {
+    this.emoji = emoji;
+  }
+  getName() {
+    return this.name;
+  }
+  setName(name: string) {
+    this.name = name;
+  }
+  getType() {
+    return this.type;
+  }
+  setType(type: string) {
+    this.type = type;
+  }
+  getRarity() {
+    return this.rarity;
+  }
+  setRarity(rarity: string) {
+    this.rarity = rarity;
+  }
+  getDescription() {
+    return this.description;
+  }
+  setDescription(description: string) {
+    this.description = description;
+  }
+  getPrice() {
+    return this.price;
+  }
+  setPrice(price: number) {
+    this.price = price;
+  }
 }
-
-// How do we do armor/ shields?
-
-const simpleArmor = {
-  id: '1',
-  name: 'Leather Armor',
-  type: 'defensive',
-  rarity: 'common',
-  description: 'A simple leather armor',
-};
-
-const simpleShield = {
-  id: '2',
-  name: 'Wooden Shield',
-  type: 'defensive',
-  rarity: 'common',
-  description: 'A simple wood shield',
-};
-
-const example = {
-  weapons: [
-    {
-      name: 'Sword',
-      type: 'melee',
-      damage: '1d6',
-      crit_chance: 5, // Represents a 1 in 20 chance (20 - 5 + 1)
-      crit_fail_chance: 1, // Represents a 1 in 20 chance
-      price: 10,
-    },
-    {
-      name: 'Dagger',
-      type: 'melee',
-      damage: '1d4',
-      crit_chance: 10, // Higher crit chance
-      crit_fail_chance: 2,
-      price: 8,
-    },
-    // ... other weapons
-  ],
-  defensive_items: [
-    {
-      name: 'Shield',
-      type: 'defensive',
-      damage_reduction: 2,
-      price: 15,
-    },
-    {
-      name: 'Armor',
-      type: 'defensive',
-      crit_hit_reduction: 5, // Reduces crit hit chance against the player
-      price: 20,
-    },
-    // ... other defensive items
-  ],
-  consumables: [
-    {
-      name: 'Health Potion',
-      type: 'consumable',
-      effect: 'heal',
-      heal_amount: '2d4',
-      price: 5,
-      cooldown: 0, // No cooldown for potions
-    },
-    {
-      name: 'Mana Potion',
-      type: 'consumable',
-      effect: 'restore_mana',
-      mana_amount: 10,
-      price: 5,
-      cooldown: 0,
-    },
-    // ... other consumables
-  ],
-  special_items: [
-    {
-      name: 'Teleport Scroll',
-      type: 'special',
-      effect: 'teleport',
-      cooldown: 3, // Number of turns before it can be used again
-      price: 12,
-    },
-    // ... other special items
-  ],
-};

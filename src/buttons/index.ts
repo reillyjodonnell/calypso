@@ -1,4 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { create } from 'ts-node';
 
 export function getAllButtonOptions({
   guildId,
@@ -44,10 +45,20 @@ export function getAllButtonOptions({
     }),
     false
   );
+  // const useButton = createUseButton(
+  //   createButtonId({
+  //     action: 'use',
+  //     guildId: guildId,
+  //     threadId: channelId,
+  //     counter: leaveId,
+  //   }),
+  //   false
+  // );
   const row = new ActionRowBuilder().addComponents(
     attackButton,
     healButton,
     statsButton
+    // useButton
   );
   return row;
 }
@@ -140,6 +151,15 @@ export function createInventoryButton(id: string, isDisabled: boolean) {
     .setLabel('Inventory')
     .setStyle(ButtonStyle.Secondary) // Red color for leave
     .setEmoji('🎒')
+    .setDisabled(isDisabled);
+}
+
+export function createUseButton(id: string, isDisabled: boolean) {
+  return new ButtonBuilder()
+    .setCustomId(id)
+    .setLabel('Use')
+    .setStyle(ButtonStyle.Secondary) // Red color for leave
+    .setEmoji('🔮')
     .setDisabled(isDisabled);
 }
 
