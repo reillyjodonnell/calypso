@@ -349,6 +349,12 @@ export class DuelService {
       };
     }
 
+    if (attacker.getId() !== duel.getCurrentTurnPlayerId()) {
+      return {
+        status: NOT_ATTACKERS_TURN,
+      };
+    }
+
     if (!sidedDie) {
       throw new Error('sidedDie is null');
     }

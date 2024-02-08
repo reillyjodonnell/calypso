@@ -1,4 +1,4 @@
-import { simpleWeapons } from '../item/PretendDBForItems';
+import { simpleWeapons } from '../item/MockItemDB';
 import { WeaponDTO } from '../item/WeaponDTO';
 import { Weapon } from '../item/weapon';
 
@@ -8,7 +8,7 @@ export class StoreRepository {
       // loop and create WeaponDTO for each
       const items = simpleWeapons.map((weapon) => {
         // by default all weapons are unequipped
-        const weaponDTO = WeaponDTO.fromDTO({ ...weapon, equipped: false });
+        const weaponDTO = WeaponDTO.fromDTO({ ...weapon });
         return weaponDTO;
       });
       resolve(items);
@@ -19,7 +19,7 @@ export class StoreRepository {
     return new Promise((resolve, _) => {
       const item = simpleWeapons.find((weapon) => weapon.id === itemId);
       if (item) {
-        const weaponDTO = WeaponDTO.fromDTO({ ...item, equipped: false });
+        const weaponDTO = WeaponDTO.fromDTO({ ...item });
         resolve(weaponDTO);
       } else {
         resolve(null);

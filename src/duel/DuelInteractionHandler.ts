@@ -585,6 +585,9 @@ export class DuelInteractionHandler {
   async handleAttackTargetSelected(
     interaction: StringSelectMenuInteraction<CacheType>
   ) {
+    console.log(
+      `user: ${interaction.user.id} selected ${interaction.values[0]}`
+    );
     const targetId = interaction.values[0];
     const discordService = new DiscordService();
     const duelThread = await discordService.findDuelThread(
@@ -859,14 +862,15 @@ export class DuelInteractionHandler {
       return;
     }
 
-    if (!rolls || !modifier) throw new Error('rolls is null');
+    if (!rolls) throw new Error('rolls is null');
 
-    const modifierStatement =
-      modifier < 0
+    const modifierStatement = modifier
+      ? modifier < 0
         ? ` with a -${modifier} damage modifier`
         : modifier > 0
         ? ` with a +${modifier} damage modifier`
-        : '';
+        : ''
+      : '';
 
     const formattedRolls = formatCommaSeparatedList(rolls);
     const rollsWithDamage = `<@${interaction.user.id}> rolled a ${formattedRolls}${modifierStatement} and dealt ${damage} damage!`;

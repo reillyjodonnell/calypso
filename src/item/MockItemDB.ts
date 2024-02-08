@@ -55,7 +55,7 @@ const simpleBow = {
   description: 'Deals 1d6 damage with a +1 to hit. High crit fail chance',
   damage: '1d6',
   rollToHit: '1d20 + 1',
-  critHit: [20],
+  critHit: [21],
   critFail: [2, 3],
   critChance: 0.05,
   critFailChance: 0.1,

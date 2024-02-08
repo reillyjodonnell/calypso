@@ -45,3 +45,19 @@ function createMockDuel() {
 function createMockPlayer(id: string) {
   return new Player(id);
 }
+
+describe('determine winner', () => {
+  it('should return the right user when someone kills themselves', () => {
+    const duel = new Duel('1');
+    const attacker = new Player('1');
+    const defender = new Player('2');
+    attacker.setHealth(0);
+    defender.setHealth(1);
+
+    const { winnerId } = new DuelService().determineWinner([
+      attacker,
+      defender,
+    ]);
+    expect(winnerId).toBe(defender.getId());
+  });
+});

@@ -1,3 +1,5 @@
+import { ItemEffects } from '../item/ItemEffects';
+
 export const MAX_HEALTH = 14;
 export class Player {
   private id: string;
@@ -16,8 +18,19 @@ export class Player {
   // may also include +1 for to hit modifier
   private rollToHit: string = '1d20';
 
+  private effects: ItemEffects[] = [];
+
   constructor(id: string) {
     this.id = id;
+  }
+  public addEffect(effect: ItemEffects) {
+    this.effects.push(effect);
+  }
+  public getEffects() {
+    return this.effects;
+  }
+  public removeEffect(effect: ItemEffects) {
+    this.effects = this.effects.filter((e) => e !== effect);
   }
   public getId() {
     return this.id;

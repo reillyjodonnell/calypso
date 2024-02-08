@@ -1,7 +1,7 @@
 import { RedisClientType } from '@redis/client';
 import { WeaponDTO } from '../item/WeaponDTO';
 import { Weapon } from '../item/weapon';
-import { simpleWeapons } from '../item/PretendDBForItems';
+import { simpleWeapons } from '../item/MockItemDB';
 
 export class WeaponRepository {
   private redisClient: RedisClientType;
