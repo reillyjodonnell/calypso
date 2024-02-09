@@ -1,5 +1,3 @@
-import { ItemEffects } from '../item/ItemEffects';
-
 export const MAX_HEALTH = 14;
 export class Player {
   private id: string;

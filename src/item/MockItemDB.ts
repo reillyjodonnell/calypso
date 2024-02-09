@@ -149,10 +149,10 @@ const suddenStrike = {
   price: 30,
 };
 
-export const specialItems = {
+export const specialItems = [
   smokeBomb,
   mirrorShield,
   riskyPotion,
   healersHerb,
   suddenStrike,
-};
+];

@@ -1,4 +1,7 @@
 import { getRollsWithModifiers, parseDieAndRoll } from '../dice/dice';
+import { Item } from '../item/Item';
+import { ItemEffect } from '../item/ItemEffects';
+import { ItemRepository } from '../item/ItemRepository';
 import { Weapon } from '../item/weapon';
 import { Player } from '../player/player';
 import { RandomEventsGenerator } from '../randomEvents/RandomEventsGenerator';
@@ -481,6 +484,19 @@ export class DuelService {
         status: 'PLAYER_NOT_FOUND',
       };
     }
+
+    const itemRepository = new ItemRepository();
+
+    const item: Item = await itemRepository.getItemById(itemId);
+
+    if (!item) {
+      throw new Error('Item not found');
+    }
+
+    const itemEffectName = item.getName();
+
+    // apply the item effect
+    const itemEffect = new ItemEffect(itemEffectName, turnsRemaining);
 
     duel.setPlayerUsedItem(player.getId());
 
