@@ -55,6 +55,7 @@ import { LeaderboardService } from './src/leaderboard/LeaderboardService';
 import { getItemsEmbed, parseItemsButtonId } from './src/item/ItemsEmbed';
 import { ItemRepository } from './src/item/ItemRepository';
 import { ItemDTO } from './src/item/itemDTO';
+import { ItemInteractionHandler } from './src/item/ItemInteractionHandler';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -138,6 +139,16 @@ const dualInteractionHandler = new DuelInteractionHandler(
   inventoryRepository,
   weaponRepository
 );
+
+const itemInteractionHandler = new ItemInteractionHandler({
+  inventoryRepository,
+  discordService,
+  duelRepository,
+  duelService,
+  playerRepository,
+  duelWinManager,
+  duelCleanup,
+});
 
 try {
   await rest.put(Routes.applicationCommands(CLIENT_ID), {
@@ -495,171 +506,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.customId.startsWith('item')) {
-      // using an item in the duel
-      const { action, itemId, playerId } = parseItemsButtonId(
-        interaction.customId
-      );
-
-      if (action !== 'item') {
-        console.error('Caught in the wrong action for item');
-        return;
-      }
-
-      const itemRes = await inventoryRepository.getItem(playerId, itemId);
-      if (!itemRes) {
-        await interaction.reply({
-          content: 'Item not found.',
-          ephemeral: true,
-        });
-        return;
-      }
-      const { id } = itemRes;
-      const channelId = interaction.channelId;
-      const guild = interaction.guild;
-      const duelThread = await discordService.findDuelThread(guild, channelId);
-
-      if (!duelThread) {
-        await interaction.reply({
-          content: 'Duel channel not found or is not a text channel.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const duel = await duelRepository.getById(duelThread?.id);
-
-      // make sure they haven't used in an item in a duel yet
-      const canUseItem = await duelService.canUseItem({ duel, playerId });
-
-      if (
-        typeof canUseItem !== 'boolean' &&
-        canUseItem.status === DUEL_NOT_FOUND
-      ) {
-        await interaction.reply({
-          content: 'Duel not found.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      if (typeof canUseItem === 'boolean' && !canUseItem) {
-        await interaction.reply({
-          content: 'You have already used an item this duel.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      if (!duel?.getId()) {
-        await interaction.reply({
-          content: 'Duel not found.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const player = await playerRepository.getById(duel.getId(), playerId);
-
-      // use the item
-      const { status, item, playerDead, ...res } = await duelService.useItem({
-        duel,
-        player,
-        itemId: id,
-      });
-      const { damage, heal } = res;
-
-      if (!player) {
-        throw new Error('Player not found');
-      }
-
-      inventoryRepository.useItem(playerId, itemId);
-
-      await playerRepository.save(player, duel.getId());
-      await duelRepository.save(duel);
-
-      if (playerDead) {
-        const duelThread = await discordService.findDuelThread(
-          interaction.guild,
-          interaction?.channelId
-        );
-        // the game has ended the other player has won
-        const winnerId = duel.getPlayersIds().find((p) => p !== player.getId());
-
-        if (!winnerId) {
-          throw new Error('Winner not found');
-        }
-
-        const otherPlayer = await playerRepository.getById(
-          duel.getId(),
-          winnerId
-        );
-
-        if (!otherPlayer) {
-          throw new Error('Other player not found');
-        }
-
-        await interaction.reply(
-          `<@${player.getId()}> took the potion but has died! Oh no! <@${winnerId}> wins!`
-        );
-        //  message user that they won 5 gold
-        await interaction.followUp({
-          content: `<@${winnerId}> has won 5 gold!`,
-        });
-        // lock the thread bc the game is over
-        await duelThread?.setLocked(true);
-        const wagerResults = await duelWinManager.handleWin(
-          interaction.channelId,
-          [player, otherPlayer]
-        );
-        if (wagerResults) {
-          await interaction.followUp({ embeds: [wagerResults] });
-        }
-        if (!duelThread) throw new Error('duelThread is null');
-        await duelCleanup.remove(duelThread.id, duel);
-        return;
-      }
-
-      if (status === DUEL_NOT_FOUND) {
-        await interaction.reply({
-          content: 'Duel not found.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      let prompt;
-
-      if (damage) {
-        prompt = `and got hurt for ${damage} damage!`;
-      }
-
-      if (heal) {
-        prompt = `and healed for ${heal} health!`;
-      }
-
-      const fullMessage = `<@${player.getId()}> used ${item?.getName()} ${prompt}`;
-
-      // show how much health they have left
-      const playerHealth = player.getHealth();
-
-      //prompt the other play to go
-      const row = getAllButtonOptions({
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        userId: interaction.user.id,
-        attackId: duelService.getCounter(),
-        healId: duelService.getCounter(),
-        leaveId: duelService.getCounter(),
-      });
-
-      // damage is the total damage and rolls are an array of each roll as a number
-      const nextPlayerId = duel.getCurrentTurnPlayerId();
-      const nextPlayerPrompt = `<@${nextPlayerId}> it's your turn!`;
-
-      await interaction.reply({
-        content: `${fullMessage} <@${player.getId()}> has ${playerHealth} health left.\n\n${nextPlayerPrompt}`,
-        components: [row as any],
-      });
+      itemInteractionHandler.handleItemUse(interaction);
     }
 
     // inventory

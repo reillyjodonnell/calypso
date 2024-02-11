@@ -477,15 +477,14 @@ export class DuelService {
   async useItem({
     duel,
     player,
-    itemId,
+    item,
   }: {
     duel: Duel | null;
     player: Player | null;
-    itemId: string;
+    item: Item;
   }): Promise<{
     status: typeof DUEL_NOT_FOUND | 'ITEM_USED' | 'PLAYER_NOT_FOUND';
     damage?: number;
-    item?: Item;
     heal?: number;
     playerDead?: boolean;
   }> {
@@ -499,14 +498,6 @@ export class DuelService {
       return {
         status: 'PLAYER_NOT_FOUND',
       };
-    }
-
-    const itemRepository = new ItemRepository();
-
-    const item = await itemRepository.getItemById(itemId);
-
-    if (!item) {
-      throw new Error('Item not found');
     }
 
     const itemEffectName = item.getName();
@@ -525,27 +516,29 @@ export class DuelService {
 
     duel.nextTurn();
 
-    // the other layer will handle removing the item from the players inventory
     return {
       status: 'ITEM_USED',
       damage: res?.damage,
-      item,
       heal: res?.heal,
       playerDead: player.isPlayerDead(),
     };
   }
 
-  canUseItem({ duel, playerId }: { duel: Duel | null; playerId: string }) {
-    if (!duel) {
-      return {
-        status: DUEL_NOT_FOUND,
-      };
-    }
-
+  canUseItem({ duel, playerId }: { duel: Duel; playerId: string }): {
+    status: 'ALREADY_USED_ITEM' | 'CAN_USE_ITEM';
+  } {
     // make sure the player has the item and hasn't used an item this match
     const hasUsedItem = duel.hasPlayerUsedItem(playerId);
 
-    return !hasUsedItem;
+    if (hasUsedItem) {
+      return {
+        status: 'ALREADY_USED_ITEM',
+      };
+    }
+
+    return {
+      status: 'CAN_USE_ITEM',
+    };
   }
 
   determineWinner(players: Player[]): { winnerId: string | null } {

@@ -47,7 +47,6 @@ import {
 import { DuelCleanup } from './DuelCleanup';
 import { InventoryRepository } from '../inventory/InventoryRepository';
 import { WeaponRepository } from '../weapon/WeaponRepository';
-import { test } from 'bun:test';
 
 export class DuelInteractionHandler {
   constructor(
@@ -639,7 +638,10 @@ export class DuelInteractionHandler {
     }
 
     if (status === 'NOT_ATTACKERS_TURN') {
-      await interaction.reply("It's not your turn!");
+      await interaction.reply({
+        content: "It's not your turn!",
+        ephemeral: true,
+      });
       return;
     }
 
@@ -864,7 +866,10 @@ export class DuelInteractionHandler {
     const { winnerId } = this.duelService.determineWinner([attacker, defender]);
 
     if (status === 'NOT_ATTACKERS_TURN') {
-      await interaction.reply("It's not your turn!");
+      await interaction.reply({
+        content: "It's not your turn!",
+        ephemeral: true,
+      });
       return;
     }
 
