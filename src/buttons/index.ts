@@ -1,5 +1,4 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { create } from 'ts-node';
 
 export function getAllButtonOptions({
   guildId,

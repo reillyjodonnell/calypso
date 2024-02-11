@@ -239,6 +239,7 @@ export class DuelInteractionHandler {
       );
       return;
     }
+
     if (status === PLAYER_NOT_FOUND) {
       await interaction.reply(
         'Quiet now, the match is about to begin! Wait your turn.'
