@@ -28,13 +28,13 @@ export class InventoryService {
       if (item) {
         if (item.equipped) {
           item.equipped = false;
-          await this.inventoryRepository.saveItem(playerId, item);
+          await this.inventoryRepository.saveWeapon(playerId, item);
         }
       }
     }
 
     weaponToEquip.equipped = true;
-    await this.inventoryRepository.saveItem(playerId, weaponToEquip);
+    await this.inventoryRepository.saveWeapon(playerId, weaponToEquip);
   }
 
   // ... other service methods

@@ -5,8 +5,9 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { Weapon } from '../item/weapon';
+import { Item } from '../item/Item';
 
-export function createStoreEmbed(weapons: Weapon[]) {
+export function createStoreEmbed(weapons: Weapon[], items: Item[]) {
   const storeEmbed = new EmbedBuilder()
     .setColor(0x0099ff)
     .setTitle('🏛️ Ares Armory 🏛️')
@@ -26,8 +27,15 @@ export function createStoreEmbed(weapons: Weapon[]) {
       //   inline: true,
       // })),
       // { name: '\u200B', value: '\u200B' },
-      { name: '🛡️ Basic Items', value: 'Essential items for any warrior.' },
+      { name: '🛡️ Basic weapons', value: 'Essential weapons for any warrior.' },
       ...weapons.map((item) => ({
+        name: `${item.getEmoji()} ${item.getName()}`,
+        value: `${item.getDescription()}\nPrice: ${item.getPrice()}`,
+        inline: true,
+      })),
+      { name: '\u200B', value: '\u200B' },
+      { name: '✨ Basic items', value: 'Essential items for any warrior.' },
+      ...items.map((item) => ({
         name: `${item.getEmoji()} ${item.getName()}`,
         value: `${item.getDescription()}\nPrice: ${item.getPrice()}`,
         inline: true,
@@ -36,7 +44,8 @@ export function createStoreEmbed(weapons: Weapon[]) {
     )
     .setFooter({ text: 'Use buttons below to purchase.' });
 
-  const buttons = weapons.map((item) => {
+  // buttons need to be for the weapons and items
+  const buttons = [...weapons, ...items].map((item) => {
     return new ButtonBuilder()
       .setCustomId(`buy_${item.getId()}`)
       .setLabel(`${item.getEmoji()} Buy ${item.getName()}`)

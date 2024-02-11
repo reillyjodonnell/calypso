@@ -28,7 +28,7 @@ export function getItemsEmbed({
   const itemsButtons = items.map((item) =>
     new ButtonBuilder()
       .setCustomId(createItemsButtonId({ itemId: item.getId(), playerId }))
-      .setLabel(`${item.getEmoji()} ${item.getName()}`)
+      .setLabel(`${item.getEmoji()} use ${item.getName()}`)
       .setStyle(ButtonStyle.Secondary)
   );
 

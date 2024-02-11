@@ -17,7 +17,7 @@ import {
   inventoryCommand,
   leaderboardCommand,
 } from './src/commands/slashCommands';
-import { parseButtonId } from './src/buttons';
+import { getAllButtonOptions, parseButtonId } from './src/buttons';
 import { createClient } from 'redis';
 import { GoldRepository } from './src/gold/GoldRepository';
 import { RedisClientType } from '@redis/client';
@@ -39,6 +39,7 @@ import { InventoryRepository } from './src/inventory/InventoryRepository';
 import { StoreRepository } from './src/store/StoreRepository';
 import { DuelCleanup } from './src/duel/DuelCleanup';
 import {
+  ItemWithQuantity,
   createInventoryEmbed,
   parseInventoryButtonId,
 } from './src/inventory/InventoryEmbed';
@@ -51,7 +52,9 @@ import { LeaderboardRepository } from './src/leaderboard/LeaderboardRepository';
 import cron from 'node-cron';
 import { LeaderboardApplicationService } from './src/leaderboard/LeaderboardApplicationService';
 import { LeaderboardService } from './src/leaderboard/LeaderboardService';
-import { parseItemsButtonId } from './src/item/ItemsEmbed';
+import { getItemsEmbed, parseItemsButtonId } from './src/item/ItemsEmbed';
+import { ItemRepository } from './src/item/ItemRepository';
+import { ItemDTO } from './src/item/itemDTO';
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -84,6 +87,7 @@ const duelRepository = new DuelRepository(redisClient);
 const playerRepository = new PlayerRepository(redisClient);
 const inventoryRepository = new InventoryRepository(redisClient);
 const weaponRepository = new WeaponRepository(redisClient);
+const itemRepository = new ItemRepository();
 
 const leaderboardRepository = new LeaderboardRepository(redisClient);
 
@@ -102,7 +106,8 @@ const storeRepository = new StoreRepository();
 const storeInteractionHandler = new StoreInteractionHandler(
   goldRepository,
   inventoryRepository,
-  storeRepository
+  storeRepository,
+  itemRepository
 );
 
 const userService = new UserService(inventoryRepository, storeRepository);
@@ -171,8 +176,15 @@ client.on('ready', async () => {
   // Now pass this channel to your function
   await discordService.createStartHereMessage(guild);
   if (process.env.INIT_SERVER === 'true') {
-    const weapons = await storeRepository.getItems();
-    await discordService.initializeServer(guild, weapons);
+    const weapons = await storeRepository.getWeapons();
+    // const items = await itemRepository.getWeapons();
+
+    await discordService.initializeServer(guild, weapons, items);
+  }
+  if (process.env.CREATE_STORE_EMBED === 'true') {
+    const weapons = await storeRepository.getWeapons();
+    // const items = await itemRepository.getWeapons();
+    await discordService.createNewStoreEmbed(client, weapons, items);
   }
 });
 
@@ -431,6 +443,55 @@ client.on('interactionCreate', async (interaction) => {
 
         break;
       }
+      case 'use': {
+        // make sure it's their turn
+        const duel = await duelRepository.getById(threadId);
+        if (!duel) {
+          await interaction.reply({
+            content: 'Duel not found.',
+            ephemeral: true,
+          });
+          return;
+        }
+        if (duel.getCurrentTurnPlayerId() !== interaction.user.id) {
+          await interaction.reply({
+            content: 'It is not your turn.',
+            ephemeral: true,
+          });
+          return;
+        }
+        // show the users inventory
+        const items = await inventoryRepository.getItems(interaction.user.id);
+        if (!items) {
+          await interaction.reply({
+            content: 'No items found.',
+            ephemeral: true,
+          });
+          return;
+        }
+        if (items.length === 0) {
+          await interaction.reply({
+            content: 'No items found.',
+            ephemeral: true,
+          });
+          return;
+        }
+        // fetch each item by their id
+        const itemInstances = items.map(async (item) => {
+          return await itemRepository.getItemById(item.id);
+        });
+        const resolved = await Promise.all(itemInstances);
+        const itemEmbed = getItemsEmbed({
+          items: resolved,
+          playerId: interaction.user.id,
+        });
+
+        await interaction.reply({
+          embeds: [itemEmbed.embed],
+          components: [...(itemEmbed.components as any)],
+          ephemeral: true,
+        });
+      }
     }
 
     if (interaction.customId.startsWith('item')) {
@@ -444,17 +505,28 @@ client.on('interactionCreate', async (interaction) => {
         return;
       }
 
-      const res = await inventoryRepository.getItem(playerId, itemId);
-      if (!res) {
+      const itemRes = await inventoryRepository.getItem(playerId, itemId);
+      if (!itemRes) {
         await interaction.reply({
           content: 'Item not found.',
           ephemeral: true,
         });
         return;
       }
-      const { id } = res;
+      const { id } = itemRes;
+      const channelId = interaction.channelId;
+      const guild = interaction.guild;
+      const duelThread = await discordService.findDuelThread(guild, channelId);
 
-      const duel = await duelRepository.getById(threadId);
+      if (!duelThread) {
+        await interaction.reply({
+          content: 'Duel channel not found or is not a text channel.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const duel = await duelRepository.getById(duelThread?.id);
 
       // make sure they haven't used in an item in a duel yet
       const canUseItem = await duelService.canUseItem({ duel, playerId });
@@ -489,14 +561,104 @@ client.on('interactionCreate', async (interaction) => {
       const player = await playerRepository.getById(duel.getId(), playerId);
 
       // use the item
-      await duelService.useItem({ duel, player, itemId: id });
+      const { status, item, playerDead, ...res } = await duelService.useItem({
+        duel,
+        player,
+        itemId: id,
+      });
+      const { damage, heal } = res;
 
-      // this should lower the quantity by 1
-      // apply the effect of the item
-      // send a message saying the item was used
+      if (!player) {
+        throw new Error('Player not found');
+      }
+
+      inventoryRepository.useItem(playerId, itemId);
+
+      await playerRepository.save(player, duel.getId());
+      await duelRepository.save(duel);
+
+      if (playerDead) {
+        const duelThread = await discordService.findDuelThread(
+          interaction.guild,
+          interaction?.channelId
+        );
+        // the game has ended the other player has won
+        const winnerId = duel.getPlayersIds().find((p) => p !== player.getId());
+
+        if (!winnerId) {
+          throw new Error('Winner not found');
+        }
+
+        const otherPlayer = await playerRepository.getById(
+          duel.getId(),
+          winnerId
+        );
+
+        if (!otherPlayer) {
+          throw new Error('Other player not found');
+        }
+
+        await interaction.reply(
+          `<@${player.getId()}> took the potion but has died! Oh no! <@${winnerId}> wins!`
+        );
+        //  message user that they won 5 gold
+        await interaction.followUp({
+          content: `<@${winnerId}> has won 5 gold!`,
+        });
+        // lock the thread bc the game is over
+        await duelThread?.setLocked(true);
+        const wagerResults = await duelWinManager.handleWin(
+          interaction.channelId,
+          [player, otherPlayer]
+        );
+        if (wagerResults) {
+          await interaction.followUp({ embeds: [wagerResults] });
+        }
+        if (!duelThread) throw new Error('duelThread is null');
+        await duelCleanup.remove(duelThread.id, duel);
+        return;
+      }
+
+      if (status === DUEL_NOT_FOUND) {
+        await interaction.reply({
+          content: 'Duel not found.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      let prompt;
+
+      if (damage) {
+        prompt = `and got hurt for ${damage} damage!`;
+      }
+
+      if (heal) {
+        prompt = `and healed for ${heal} health!`;
+      }
+
+      const fullMessage = `<@${player.getId()}> used ${item?.getName()} ${prompt}`;
+
+      // show how much health they have left
+      const playerHealth = player.getHealth();
+
+      //prompt the other play to go
+      const row = getAllButtonOptions({
+        guildId: interaction.guildId,
+        channelId: interaction.channelId,
+        userId: interaction.user.id,
+        attackId: duelService.getCounter(),
+        healId: duelService.getCounter(),
+        leaveId: duelService.getCounter(),
+      });
+
+      // damage is the total damage and rolls are an array of each roll as a number
+      const nextPlayerId = duel.getCurrentTurnPlayerId();
+      const nextPlayerPrompt = `<@${nextPlayerId}> it's your turn!`;
+
       await interaction.reply({
-        content: 'Item used',
-        ephemeral: true,
+        content: `${fullMessage} <@${player.getId()}> has ${playerHealth} health left.\n\n${nextPlayerPrompt}`,
+        components: [row as any],
       });
     }
 
@@ -505,7 +667,7 @@ client.on('interactionCreate', async (interaction) => {
       const { action, itemId, playerId } = parseInventoryButtonId(
         interaction.customId
       );
-      const res = await inventoryRepository.getItem(playerId, itemId);
+      const res = await inventoryRepository.getWeapon(playerId, itemId);
       if (!res) {
         await interaction.reply({
           content: 'Item not found.',
@@ -524,7 +686,7 @@ client.on('interactionCreate', async (interaction) => {
         return;
       }
 
-      const weapons = await inventoryRepository.getItems(playerId);
+      const weapons = await inventoryRepository.getWeapons(playerId);
       if (!weapons) {
         await interaction.reply({
           content: 'No weapons found.',
@@ -540,37 +702,10 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
     }
-
-    switch (interaction.customId) {
-      // STORE
-      case 'buy_1': {
-        await storeInteractionHandler.handleStorePurchase(interaction, '1');
-        break;
-      }
-      case 'buy_2': {
-        await storeInteractionHandler.handleStorePurchase(interaction, '2');
-        break;
-      }
-      case 'buy_3': {
-        await storeInteractionHandler.handleStorePurchase(interaction, '3');
-        break;
-      }
-      case 'buy_4': {
-        await storeInteractionHandler.handleStorePurchase(interaction, '4');
-        break;
-      }
-      case 'buy_5': {
-        await storeInteractionHandler.handleStorePurchase(interaction, '5');
-        break;
-      }
-      case 'buy_6': {
-        await storeInteractionHandler.handleStorePurchase(interaction, '6');
-        break;
-      }
-      case 'buy_7': {
-        await storeInteractionHandler.handleStorePurchase(interaction, '7');
-        break;
-      }
+    if (interaction.customId.startsWith('buy')) {
+      // split the id out of it
+      const id = interaction.customId.split('_')[1];
+      await storeInteractionHandler.handleStorePurchase(interaction, id);
     }
   }
 
@@ -582,19 +717,34 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     case 'inventory': {
+      const weaponIds = await inventoryRepository.getWeapons(
+        interaction.user.id
+      );
       const itemIds = await inventoryRepository.getItems(interaction.user.id);
+
       const activeItemId = await inventoryRepository.getActiveWeapon(
         interaction.user.id
       );
-      if (!itemIds || !activeItemId) {
+      if (!weaponIds || !activeItemId) {
         await interaction.reply({
           content: 'No items found.',
           ephemeral: true,
         });
         return;
       }
+      // get each item based on the id
+      let items = [];
+      if (itemIds) {
+        for (const { id, quantity } of itemIds) {
+          const item = await itemRepository.getItemById(id);
+          if (item) {
+            items.push({ ...item, quantity });
+          }
+        }
+      }
+
       let fetchedWeapons = [];
-      for (const { id } of itemIds) {
+      for (const { id } of weaponIds) {
         const weapon = await weaponRepository.getWeapon(id);
         if (weapon) {
           fetchedWeapons.push(weapon);
@@ -607,7 +757,8 @@ client.on('interactionCreate', async (interaction) => {
       const res = createInventoryEmbed(
         interaction.user.id,
         fetchedWeapons,
-        equippedWeapon
+        equippedWeapon,
+        items as ItemWithQuantity[]
       );
       if (!res) return;
 

@@ -1,9 +1,11 @@
-import { simpleWeapons } from '../item/MockItemDB';
+import { Item } from '../item/Item';
+import { simpleWeapons, specialItems } from '../item/MockItemDB';
 import { WeaponDTO } from '../item/WeaponDTO';
+import { ItemDTO } from '../item/itemDTO';
 import { Weapon } from '../item/weapon';
 
 export class StoreRepository {
-  async getItems(): Promise<Weapon[]> {
+  async getWeapons(): Promise<Weapon[]> {
     return new Promise((resolve, _) => {
       // loop and create WeaponDTO for each
       const items = simpleWeapons.map((weapon) => {
@@ -15,7 +17,7 @@ export class StoreRepository {
     });
   }
 
-  async getItem(itemId: string): Promise<Weapon | null> {
+  async getWeapon(itemId: string): Promise<Weapon | null> {
     return new Promise((resolve, _) => {
       const item = simpleWeapons.find((weapon) => weapon.id === itemId);
       if (item) {

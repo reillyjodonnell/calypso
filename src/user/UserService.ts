@@ -8,14 +8,14 @@ export class UserService {
   ) {}
   async initializeUser(playerId: string) {
     const idOfBasicSword = '1';
-    const basicSword = await this.storeRepository.getItem(idOfBasicSword);
+    const basicSword = await this.storeRepository.getWeapon(idOfBasicSword);
     if (!basicSword) {
       console.error('Could not find basic sword in store');
       return;
     }
     // equip the basic sword
-    await this.inventoryRepository.awardItem(playerId, basicSword);
-    await this.inventoryRepository.saveItem(playerId, {
+    await this.inventoryRepository.awardWeapon(playerId, basicSword);
+    await this.inventoryRepository.saveWeapon(playerId, {
       equipped: true,
       id: idOfBasicSword,
       quantity: 1,

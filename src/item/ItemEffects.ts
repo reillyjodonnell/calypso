@@ -5,13 +5,27 @@ type ItemEffectName =
   | "Healer's Herb"
   | 'Sudden Strike';
 
+export function isValidItemEffectName(name: string): name is ItemEffectName {
+  return [
+    'Smoke Bomb',
+    'Mirror Shield',
+    'Risky Potion',
+    "Healer's Herb",
+    'Sudden Strike',
+  ].includes(name);
+}
+
 export class ItemEffect {
   private name: ItemEffectName;
   private turnsRemaining: number;
 
-  constructor(name: ItemEffectName, turnsRemaining: number = 0) {
+  constructor(name: ItemEffectName) {
     this.name = name;
-    this.turnsRemaining = turnsRemaining;
+    if (name === "Healer's Herb") {
+      this.turnsRemaining = 4;
+    } else {
+      this.turnsRemaining = 0;
+    }
   }
 
   getName(): ItemEffectName {

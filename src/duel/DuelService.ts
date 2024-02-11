@@ -1,6 +1,7 @@
 import { getRollsWithModifiers, parseDieAndRoll } from '../dice/dice';
 import { Item } from '../item/Item';
-import { ItemEffect } from '../item/ItemEffects';
+import { ItemEffectService } from '../item/ItemEffectService';
+import { ItemEffect, isValidItemEffectName } from '../item/ItemEffects';
 import { ItemRepository } from '../item/ItemRepository';
 import { Weapon } from '../item/weapon';
 import { Player } from '../player/player';
@@ -114,8 +115,8 @@ export class DuelService {
   } {
     // Validate that the player accepting the duel is the challenged player
     const challengedRole = duel.getPlayerRole(challengedId);
-    if (!challengedRole) throw new Error('Player not found');
-    if (challengedRole !== CHALLENGED) {
+
+    if (challengedRole !== CHALLENGED || !challengedRole) {
       return {
         status: PLAYER_NOT_CHALLENGED,
       };
@@ -309,6 +310,7 @@ export class DuelService {
         status: PLAYER_NOT_FOUND,
       };
     }
+    console.log(attacker.getTargetId(), 'attacker.getTargetId()');
     return {
       status: 'TARGET_FOUND',
       targetId: attacker.getTargetId(),
@@ -367,10 +369,22 @@ export class DuelService {
       criticalHit
     );
 
-    // attack the target
-    defender.hurt(total);
-    const isTargetDead = defender.isPlayerDead();
-    const targetHealthRemaining = defender.getHealth();
+    let sepuku = false;
+    // if the attacker and defender are the same player, the attacker hurts themselves
+    if (attacker.getId() === defender.getId()) {
+      sepuku = true;
+      attacker.hurt(total);
+    } else {
+      // attack the target
+      defender.hurt(total);
+    }
+
+    const isTargetDead = sepuku
+      ? attacker.isPlayerDead()
+      : defender.isPlayerDead();
+    const targetHealthRemaining = sepuku
+      ? attacker.getHealth()
+      : defender.getHealth();
     attacker.clearTarget();
 
     // move to next turn
@@ -470,8 +484,10 @@ export class DuelService {
     itemId: string;
   }): Promise<{
     status: typeof DUEL_NOT_FOUND | 'ITEM_USED' | 'PLAYER_NOT_FOUND';
-    player?: Player;
-    duel?: Duel;
+    damage?: number;
+    item?: Item;
+    heal?: number;
+    playerDead?: boolean;
   }> {
     if (!duel) {
       return {
@@ -487,25 +503,35 @@ export class DuelService {
 
     const itemRepository = new ItemRepository();
 
-    const item: Item = await itemRepository.getItemById(itemId);
+    const item = await itemRepository.getItemById(itemId);
 
     if (!item) {
       throw new Error('Item not found');
     }
 
     const itemEffectName = item.getName();
+    if (!isValidItemEffectName(itemEffectName)) {
+      throw new Error('Invalid item effect name');
+    }
 
     // apply the item effect
-    const itemEffect = new ItemEffect(itemEffectName, turnsRemaining);
+    const itemEffect = new ItemEffect(itemEffectName);
+
+    const itemEffectService = new ItemEffectService();
+
+    const res = itemEffectService.applyEffect(player, itemEffect);
 
     duel.setPlayerUsedItem(player.getId());
 
     duel.nextTurn();
 
+    // the other layer will handle removing the item from the players inventory
     return {
       status: 'ITEM_USED',
-      player,
-      duel,
+      damage: res?.damage,
+      item,
+      heal: res?.heal,
+      playerDead: player.isPlayerDead(),
     };
   }
 
@@ -524,10 +550,14 @@ export class DuelService {
 
   determineWinner(players: Player[]): { winnerId: string | null } {
     // Filter out players who are still alive
-    const alivePlayers = players.filter((player) => !player.isPlayerDead());
+    const alivePlayers = players.filter((player) => {
+      console.log(`player ${player.getId()} health ${player.getHealth}`);
+      return !player.isPlayerDead();
+    });
 
     // Check if exactly one player is still alive
     if (alivePlayers.length === 1) {
+      console.log('winnerId', alivePlayers[0].getId());
       return { winnerId: alivePlayers[0].getId() };
     }
 

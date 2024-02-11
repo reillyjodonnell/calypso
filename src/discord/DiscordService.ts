@@ -16,6 +16,7 @@ import {
 } from '../startHere/startHereEmbed';
 import { Weapon } from '../item/weapon';
 import { createStoreEmbed } from '../store/StoreEmbed';
+import { Item } from '../item/Item';
 const DUEL_CHANNEL_NAME = 'duels';
 
 export class DiscordService {
@@ -30,7 +31,11 @@ export class DiscordService {
     }
     return guild;
   }
-  async initializeServer(guild: Guild | null, weapons: Weapon[]) {
+  async initializeServer(
+    guild: Guild | null,
+    weapons: Weapon[],
+    items: Item[]
+  ) {
     if (!guild) return console.log('Guild not found');
 
     // if the store category doesn't exist, create it
@@ -80,7 +85,7 @@ export class DiscordService {
     });
 
     // post embed to the store channel
-    const { components, embed } = createStoreEmbed(weapons);
+    const { components, embed } = createStoreEmbed(weapons, items);
 
     // Send the store embed to the store channel
     storeChannel.send({ embeds: [embed], components: components as any });
@@ -122,6 +127,17 @@ export class DiscordService {
     });
 
     console.log('Server initialized successfully.');
+  }
+
+  async createNewStoreEmbed(client: Client, weapons: Weapon[], items: Item[]) {
+    const { components, embed } = createStoreEmbed(weapons, items);
+    // retrieve channel by it's id
+
+    const storeChannel = (await client.channels.fetch(
+      process.env.STORE_CHANNEL_ID as string
+    )) as TextChannel;
+    // Send the store embed to the store channel
+    storeChannel.send({ embeds: [embed], components: components as any });
   }
 
   async createStartHereMessage(guild: Guild) {

@@ -45,20 +45,20 @@ export function getAllButtonOptions({
     }),
     false
   );
-  // const useButton = createUseButton(
-  //   createButtonId({
-  //     action: 'use',
-  //     guildId: guildId,
-  //     threadId: channelId,
-  //     counter: leaveId,
-  //   }),
-  //   false
-  // );
+  const useButton = createUseButton(
+    createButtonId({
+      action: 'use',
+      guildId: guildId,
+      threadId: channelId,
+      counter: leaveId,
+    }),
+    false
+  );
   const row = new ActionRowBuilder().addComponents(
     attackButton,
     healButton,
-    statsButton
-    // useButton
+    statsButton,
+    useButton
   );
   return row;
 }

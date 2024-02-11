@@ -7,10 +7,13 @@ import {
 import { Weapon } from '../item/weapon';
 import { Item } from '../item/Item';
 
+export type ItemWithQuantity = Item & { quantity: number };
+
 export function createInventoryEmbed(
   playerId: string,
   inventory: Weapon[] | Item[] | null,
-  equippedWeapon: Weapon | undefined
+  equippedWeapon: Weapon | undefined,
+  items: ItemWithQuantity[]
 ) {
   // return an empty inventory message if the user has no items
   if (!inventory || inventory.length === 0) {
@@ -36,6 +39,18 @@ export function createInventoryEmbed(
         inline: true,
       }))
     );
+
+  if (items.length > 0) {
+    console.log(items);
+    inventoryEmbed.addFields(
+      ...items.map((item) => ({
+        name: `${item.emoji} ${item.name} x${item.quantity}`,
+        value: item.description,
+        inline: true,
+      }))
+    );
+  }
+
   const inventoryButtons = inventory.map((item) =>
     new ButtonBuilder()
       .setCustomId(createInventoryButtonId({ playerId, itemId: item.getId() }))

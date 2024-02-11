@@ -95,7 +95,7 @@ const smokeBomb = {
   rarity: 'uncommon',
   description:
     'Gives a chance that the opponent misses their next attack. Opponent unaware of usage.',
-  effect: 'missChanceIncrease',
+  // effect: 'missChanceIncrease',
   price: 15,
 };
 
@@ -107,7 +107,7 @@ const mirrorShield = {
   rarity: 'rare',
   description:
     'Reflects a random percentage of the opponent’s attack back at them.',
-  effect: 'reflectDamage',
+  // effect: 'reflectDamage',
   price: 30,
 };
 
@@ -117,11 +117,11 @@ const riskyPotion = {
   name: 'Risky Potion',
   type: 'consumable',
   rarity: 'uncommon',
-  description: 'Heals significantly or deals minor damage. It’s a gamble!',
-  effect: 'randomHealOrDamage',
-  maxHealAmount: 20,
-  maxDamageAmount: 5,
-  price: 25,
+  description: 'Heals to max HP or damages 5. It’s a gamble!',
+  // effect: 'randomHealOrDamage',
+  // maxHealAmount: 20,
+  // maxDamageAmount: 5,
+  price: 5,
 };
 
 const healersHerb = {
@@ -131,9 +131,9 @@ const healersHerb = {
   type: 'healing',
   rarity: 'common',
   description: 'Restores health gradually over a few turns.',
-  effect: 'healingPerTurn',
-  healingPerTurn: 3,
-  duration: 4,
+  // effect: 'healingPerTurn',
+  // healingPerTurn: 3,
+  // duration: 4,
   price: 15,
 };
 
@@ -144,15 +144,15 @@ const suddenStrike = {
   type: 'offensive',
   rarity: 'uncommon',
   description: 'Attack twice in one turn with reduced damage.',
-  effect: 'doubleAttackReducedDamage',
-  damageReduction: 0.5,
+  // effect: 'doubleAttackReducedDamage',
+  // damageReduction: 0.5,
   price: 30,
 };
 
 export const specialItems = [
-  smokeBomb,
-  mirrorShield,
+  // smokeBomb,
+  // mirrorShield,
   riskyPotion,
-  healersHerb,
-  suddenStrike,
+  // healersHerb,
+  // suddenStrike,
 ];

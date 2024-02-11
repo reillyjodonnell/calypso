@@ -261,23 +261,21 @@ export class DuelInteractionHandler {
         })
       );
 
-      const wagerButton = createWagerButton(
-        createButtonId({
-          guildId: interaction.guildId,
-          action: 'wager',
-          threadId: interaction.channelId,
-          counter: this.duelService.getCounter(),
-        })
-      );
+      // const wagerButton = createWagerButton(
+      //   createButtonId({
+      //     guildId: interaction.guildId,
+      //     action: 'wager',
+      //     threadId: interaction.channelId,
+      //     counter: this.duelService.getCounter(),
+      //   })
+      // );
 
       const row = new ActionRowBuilder().addComponents(
-        rollForInitativeButton,
-        wagerButton
+        rollForInitativeButton
+        // wagerButton
       );
 
-      await interaction.reply(
-        `All players are now ready!\n\nWagering is open until a player rolls for initiative! Good luck!`
-      );
+      await interaction.reply(`All players are now ready!\n\n`);
       const mentionPlayers = ids?.map((id: string) => `<@${id}>`).join(' ');
       try {
         await duelThread?.send({
@@ -614,6 +612,8 @@ export class DuelInteractionHandler {
       targetId
     );
 
+    // the target and user may be the same person
+
     if (!attacker || !defender || !duel) {
       await interaction.reply({
         content: 'Something went wrong! Try again!',
@@ -852,8 +852,13 @@ export class DuelInteractionHandler {
     });
 
     this.duelRepository.save(duel);
-    this.playerRepository.save(attacker, duelThread.id);
-    this.playerRepository.save(defender, duelThread.id);
+
+    if (attacker.getId() === defender.getId()) {
+      this.playerRepository.save(attacker, duelThread.id);
+    } else {
+      this.playerRepository.save(attacker, duelThread.id);
+      this.playerRepository.save(defender, duelThread.id);
+    }
 
     const { winnerId } = this.duelService.determineWinner([attacker, defender]);
 
