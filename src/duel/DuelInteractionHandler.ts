@@ -47,7 +47,6 @@ import {
 import { DuelCleanup } from './DuelCleanup';
 import { InventoryRepository } from '../inventory/InventoryRepository';
 import { WeaponRepository } from '../weapon/WeaponRepository';
-import { test } from 'bun:test';
 
 export class DuelInteractionHandler {
   constructor(
@@ -62,10 +61,24 @@ export class DuelInteractionHandler {
   ) {}
 
   async handleDuel(interaction: ChatInputCommandInteraction<CacheType>) {
-    const user = interaction.options.getUser('user', true);
+    const challengedId = interaction.options.getUser('user', true).id;
     const challengerId = interaction.user.id;
+
+    if (challengedId === challengerId) {
+      await interaction.reply({
+        content: 'You cannot duel yourself!',
+        ephemeral: true,
+      });
+    }
+
+    if (challengedId === process.env.CALYPSO_ID) {
+      await interaction.reply({
+        content: 'You cannot challenge me!',
+        ephemeral: true,
+      });
+    }
     const duelThread = await this.discordService.createDuelThread({
-      challengedId: user.id,
+      challengedId,
       challengerId,
       guild: interaction.guild,
     });
@@ -75,7 +88,7 @@ export class DuelInteractionHandler {
       challengerId
     );
     const challengedWeaponRes = await this.inventoryRepository.getActiveWeapon(
-      user.id
+      challengedId
     );
 
     if (!challengerWeaponRes || !challengedWeaponRes) {
@@ -102,7 +115,7 @@ export class DuelInteractionHandler {
     }
 
     const { status, players, duel } = this.duelService.challengePlayer({
-      challengedId: user.id,
+      challengedId,
       challengerId,
       duelId: duelThread.id,
       challengerWeapon,
@@ -123,7 +136,7 @@ export class DuelInteractionHandler {
     if (status === DUEL_STARTED) {
       const threadLink = `https://discord.com/channels/${interaction.guild?.id}/${duelThread.id}`;
       await interaction.reply(
-        `Duel started! 👀 <@${challengerId}> challenged <@${user.id}> to a duel!\n\nGo to this link to check out their duel: ${threadLink}`
+        `Duel started! 👀 <@${challengerId}> challenged <@${challengedId}> to a duel!\n\nGo to this link to check out their duel: ${threadLink}`
       );
 
       // create button
@@ -153,7 +166,7 @@ export class DuelInteractionHandler {
       );
 
       await duelThread.send({
-        content: `<@${challengerId}>, <@${user.id}>, your duel has been set up here. Please use this thread for all duel-related commands and interactions.\n\n<@${user.id}> accept the duel to begin.`,
+        content: `<@${challengerId}>, <@${challengedId}>, your duel has been set up here. Please use this thread for all duel-related commands and interactions.\n\n<@${challengedId}> accept the duel to begin.`,
         components: [row as any], // Send the button with the message
       });
     } else if (status === DUEL_INVALID) {
@@ -239,6 +252,7 @@ export class DuelInteractionHandler {
       );
       return;
     }
+
     if (status === PLAYER_NOT_FOUND) {
       await interaction.reply(
         'Quiet now, the match is about to begin! Wait your turn.'
@@ -583,9 +597,6 @@ export class DuelInteractionHandler {
   async handleAttackTargetSelected(
     interaction: StringSelectMenuInteraction<CacheType>
   ) {
-    console.log(
-      `user: ${interaction.user.id} selected ${interaction.values[0]}`
-    );
     const targetId = interaction.values[0];
     const discordService = new DiscordService();
     const duelThread = await discordService.findDuelThread(
@@ -638,7 +649,10 @@ export class DuelInteractionHandler {
     }
 
     if (status === 'NOT_ATTACKERS_TURN') {
-      await interaction.reply("It's not your turn!");
+      await interaction.reply({
+        content: "It's not your turn!",
+        ephemeral: true,
+      });
       return;
     }
 
@@ -806,8 +820,6 @@ export class DuelInteractionHandler {
     const res = this.duelService.getAttackerTargetId(attacker);
 
     if (res.status === PLAYER_NOT_FOUND || !res.targetId) {
-      console.log('status: ', res.status);
-      console.log('targetId: ', res.targetId);
       await interaction.reply({
         content: 'You need to select a target first!',
         ephemeral: true,
@@ -842,7 +854,7 @@ export class DuelInteractionHandler {
       damage,
       targetHealthRemaining,
       nextPlayerId,
-      modifier,
+      rollModifier: modifier,
     } = this.duelService.rollFordamage({
       duel,
       attacker,
@@ -863,7 +875,10 @@ export class DuelInteractionHandler {
     const { winnerId } = this.duelService.determineWinner([attacker, defender]);
 
     if (status === 'NOT_ATTACKERS_TURN') {
-      await interaction.reply("It's not your turn!");
+      await interaction.reply({
+        content: "It's not your turn!",
+        ephemeral: true,
+      });
       return;
     }
 
@@ -1023,6 +1038,89 @@ export class DuelInteractionHandler {
         ephemeral: true,
       });
     }
+  }
+
+  // This is in case a game ever fucks up and needs to manually resolve
+  async resolveGame(interaction: ButtonInteraction<CacheType>) {
+    // retrieve the duel
+    const duelThread = await this.discordService.findDuelThread(
+      interaction.guild,
+      interaction.channelId
+    );
+
+    if (!duelThread) {
+      await interaction.reply({
+        content: 'Duel not found. Please try again!',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const duel = await this.duelRepository.getById(duelThread.id);
+
+    if (!duel) {
+      await interaction.reply({
+        content: 'Duel not found. Please try again!',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const playerIds = duel.getPlayersIds();
+
+    const player1 = await this.playerRepository.getById(
+      duelThread.id,
+      playerIds[0]
+    );
+    const player2 = await this.playerRepository.getById(
+      duelThread.id,
+      playerIds[1]
+    );
+
+    if (!player1 || !player2) {
+      await interaction.reply({
+        content: 'Duel not found. Please try again!',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const winner = this.duelService.determineWinner([player1, player2]);
+
+    if (!winner) {
+      await interaction.reply({
+        content: 'No winner found. Please try again!',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const wagerResults = await this.duelWinManager.handleWin(
+      interaction.channelId,
+      [player1, player2]
+    );
+
+    await duelThread.setLocked(true);
+    await this.duelCleanup.remove(duelThread.id, duel);
+
+    await interaction.reply({
+      content: `<@${winner.winnerId}> wins!`,
+      ephemeral: true,
+    });
+
+    //  message user that they won 5 gold
+    await interaction.followUp({
+      content: `<@${winner.winnerId}> has won 5 gold!`,
+    });
+
+    if (wagerResults) {
+      await interaction.followUp({ embeds: [wagerResults] });
+    }
+    // lock the thread bc the game is over
+    await duelThread.setLocked(true);
+
+    await this.duelCleanup.remove(duelThread.id, duel);
+    return;
   }
 }
 

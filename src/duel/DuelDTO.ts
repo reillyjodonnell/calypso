@@ -7,6 +7,7 @@ interface ParticipantDTO {
   isReady: boolean;
   rolledInitative: number;
   playerId: string;
+  hasUsedItem: boolean;
 }
 
 export class DuelDTO {
@@ -26,6 +27,7 @@ export class DuelDTO {
         isReady: details.isReady,
         role: details.role,
         rolledInitative: details.rolledInitative,
+        hasUsedItem: details.hasUsedItem,
       })
     );
     this.isBettingOpen = duel.getIsBettingOpen();
@@ -49,13 +51,15 @@ export class DuelDTO {
       if (participantDTO.rolledInitative) {
         duel.setPlayerInititative(playerId, participantDTO.rolledInitative);
       }
+      if (participantDTO.hasUsedItem) {
+        duel.setPlayerUsedItem(playerId);
+      }
     });
     duel.setIsBettingOpen(duelDTO.isBettingOpen);
     duel.setTurnNumber(duelDTO.turnNumber);
     duel.setCurrentTurn(duelDTO.currentTurn);
     duel.setTurnOrder(duelDTO.turnOrder);
     duel.setSkippedPlayersIds(duelDTO.skippedPlayersIds);
-
     return duel;
   }
 }
