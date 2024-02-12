@@ -596,7 +596,8 @@ export class DuelInteractionHandler {
       });
 
       await interaction.reply({
-        content: `<@${interaction.user.id}> rolled a ${roll} and healed ${roll} health! You have ${healthRemaining} health left.\n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`,
+        content: `<@${interaction.user.id}> rolled a ${roll} and healed ${roll} health! You have ${healthRemaining} health left.
+        \n\n<@${nextPlayerId}> it's your turn! Attack or heal yourself!`,
         components: [row as any],
       });
     }

@@ -102,12 +102,14 @@ describe('when rolling for initative', () => {
 });
 
 describe('determine winner', () => {
-  it('should return the other players id when 1 of the 2 dies', () => {
+  beforeEach(() => {
     mock.module('../dice/dice', () => {
       return {
-        parseDieAndRoll: mock(parseDieAndRoll).mockReturnValue(19),
+        parseDieAndRoll: mock(parseDieAndRoll).mockReturnValue(184),
       };
     });
+  });
+  it('should return the other players id when 1 of the 2 dies', () => {
     const duel = new Duel('1');
     const attacker = new Player('1');
     const defender = new Player('2');
@@ -158,11 +160,12 @@ describe('determine winner', () => {
 });
 
 describe('Using the sudden strike should allow user to attack twice in one turn and result in 50% less damage for the second attack (if they hit)', () => {
-  // we're hard coding that every roll is 18
-  mock.module('../dice/dice', () => {
-    return {
-      parseDieAndRoll: mock(parseDieAndRoll).mockReturnValue(18),
-    };
+  beforeEach(() => {
+    mock.module('../dice/dice', () => {
+      return {
+        parseDieAndRoll: mock(parseDieAndRoll).mockReturnValue(18),
+      };
+    });
   });
 
   it('Should allow them to hit twice', () => {
@@ -315,7 +318,13 @@ describe('Using the sudden strike should allow user to attack twice in one turn 
 });
 
 describe('Using the Mirror Shield ', () => {
-  mock(parseDieAndRoll).mockReturnValue(18);
+  beforeEach(() => {
+    mock.module('../dice/dice', () => {
+      return {
+        parseDieAndRoll: mock(parseDieAndRoll).mockReturnValue(18),
+      };
+    });
+  });
   it('Should reflect 50% of the damage back to the attacker', () => {
     const duel = new Duel('duel-id');
     const attacker = new Player('Player 1');
@@ -377,6 +386,7 @@ describe('Using the Mirror Shield ', () => {
         status,
         nextPlayerId: nextPlayerIdAfterFirstDamage2,
         attackerHealthRemaining,
+        modifiers,
       } = duelService.rollFordamage({
         duel,
         attacker: enemy,
@@ -387,17 +397,52 @@ describe('Using the Mirror Shield ', () => {
       if (status === 'TARGET_HIT' || status === 'TARGET_DEAD') {
         if (attackerHealthRemaining) {
           expect(attackerHealthBefore).toBeGreaterThan(attackerHealthRemaining);
+          expect(modifiers?.reflectedDamage).toBeGreaterThan(0);
         }
       }
+
+      duelService.attemptToHit({
+        duel,
+        attacker: attacker,
+        defender: enemy,
+        sidedDie: '1d20',
+      });
+
+      duelService.rollFordamage({
+        duel,
+        attacker,
+        defender: enemy,
+        sidedDie: '1d6',
+        criticalHit: false,
+      });
+
+      duelService.attemptToHit({
+        duel,
+        attacker: enemy,
+        defender: attacker,
+        sidedDie: '1d20',
+      });
+
+      const { modifiers: secondDamageMod } = duelService.rollFordamage({
+        duel,
+        attacker: enemy,
+        defender: attacker,
+        sidedDie: '1d6',
+        criticalHit: false,
+      });
+
+      expect(secondDamageMod?.reflectedDamage).toBeNull();
     }
   });
 });
 
 describe('Using the Healers herb', () => {
-  mock.module('../dice/dice', () => {
-    return {
-      parseDieAndRoll: mock(parseDieAndRoll).mockReturnValue(4),
-    };
+  beforeEach(() => {
+    mock.module('../dice/dice', () => {
+      return {
+        parseDieAndRoll: mock(parseDieAndRoll).mockReturnValue(4),
+      };
+    });
   });
   it('Should give the user 3 health every round', () => {
     const HEALTH_PER_ROUND = 3;
@@ -465,6 +510,22 @@ describe('Using the Healers herb', () => {
     const isOpponentTurn = duel.getCurrentTurnPlayerId() === enemy.getId();
     expect(isOpponentTurn).toBe(true);
 
+    // expect(attacker.getHealth()).toBe(
+    //   attackerStartingHealthAt2 + rounds * HEALTH_PER_ROUND
+    // );
+
+    duelService.attemptToHit({
+      duel,
+      attacker: enemy,
+      defender: attacker,
+      sidedDie: '1d20',
+    });
+    duelService.attemptToHit({
+      duel,
+      attacker,
+      defender: enemy,
+      sidedDie: '1d20',
+    });
     expect(attacker.getHealth()).toBe(
       attackerStartingHealthAt2 + rounds * HEALTH_PER_ROUND
     );

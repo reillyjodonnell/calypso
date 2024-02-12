@@ -1,6 +1,9 @@
 import { getRollsWithModifiers, parseDieAndRoll } from '../dice/dice';
 import { Item } from '../item/Item';
-import { ActionModifiers, ItemEffectService } from '../item/ItemEffectService';
+import {
+  PreAttackModifiers,
+  ItemEffectService,
+} from '../item/ItemEffectService';
 import { ItemEffect, isValidItemEffectName } from '../item/ItemEffects';
 import { Weapon } from '../item/weapon';
 import { Player } from '../player/player';
@@ -260,6 +263,7 @@ export class DuelService {
     // round up to nearest whole number
     const roll =
       parseDieAndRoll(sidedDie) / (modifiers.defenseModifierMultiple ?? 1);
+    console.log(`roll: ${roll}`);
     const doesHitTarget = Math.ceil(roll) >= defender.getAC();
 
     if (doesHitTarget) {
@@ -288,6 +292,12 @@ export class DuelService {
       player: attacker,
       playerGoesAgain: modifiers.allowExtraAttack,
     });
+
+    const nextPlayerId = duel.getCurrentTurnPlayerId();
+
+    const nextPlayer = attacker.getId() === nextPlayerId ? attacker : defender;
+
+    const {} = this.beginTurn({ duel, player: nextPlayer });
 
     if (attacker.getCriticalFail().includes(roll)) {
       return {
@@ -368,7 +378,7 @@ export class DuelService {
     rolls?: number[];
     damage?: number;
     nextPlayerId?: string;
-    modifiers?: ActionModifiers;
+    modifiers?: PreAttackModifiers;
     rollModifier?: number;
     attackerHealthRemaining?: number;
     attackerDead?: boolean;
@@ -436,6 +446,10 @@ export class DuelService {
       playerGoesAgain: modifiers.allowExtraAttack,
     });
     const nextPlayerId = duel.getCurrentTurnPlayerId();
+
+    const nextPlayer = attacker.getId() === nextPlayerId ? attacker : defender;
+
+    const {} = this.beginTurn({ duel, player: nextPlayer });
 
     return {
       status: isTargetDead ? 'TARGET_DEAD' : 'TARGET_HIT',
@@ -580,6 +594,24 @@ export class DuelService {
     return {
       status: 'CAN_USE_ITEM',
     };
+  }
+
+  beginTurn({ duel, player }: { duel: Duel; player: Player }) {
+    let res: { id: string; effect: string; amount: number }[] = [];
+    const itemEffectService = new ItemEffectService();
+    const { extraHeal } = itemEffectService.applyPreRoundEffects(player);
+
+    if (extraHeal) {
+      console.log(`healed ${extraHeal} to ${player.getId()}`);
+      player.heal(extraHeal);
+      res.push({
+        id: player.getId(),
+        effect: 'Healers Herb',
+        amount: extraHeal,
+      });
+    }
+
+    return res;
   }
 
   endTurn({

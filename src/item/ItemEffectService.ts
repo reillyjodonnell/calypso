@@ -4,7 +4,11 @@ import type { ItemEffect } from './ItemEffects';
 
 const SMOKE_BOMB_PERCENTAGE_MODIFIER = 0.7;
 
-export interface ActionModifiers {
+export interface PreRoundModifiers {
+  extraHeal: number | null;
+}
+
+export interface PreAttackModifiers {
   allowExtraAttack: boolean;
   extraAttackDamageModifier: number | null; // Default to no modification unless specified by an effect
   defenseModifierMultiple: number | null; // Additional defense modifier, could be positive or negative
@@ -13,8 +17,10 @@ export interface ActionModifiers {
 
 export class ItemEffectService {
   applyEffect(player: Player, itemEffect: ItemEffect) {
+    console.log(itemEffect.getName());
     switch (itemEffect.getName()) {
       case "Healer's Herb":
+        player.addEffect(itemEffect);
         player.heal(3);
         break;
       case 'Risky Potion':
@@ -61,10 +67,26 @@ export class ItemEffectService {
     return { heal: 20 };
   }
 
-  applyPreRoundEffects(player: Player) {}
+  applyPreRoundEffects(player: Player): PreRoundModifiers {
+    let results: PreRoundModifiers = {
+      extraHeal: null,
+    };
+    player.getEffects().forEach((effect) => {
+      console.log(effect);
+      if (effect.getTurnsRemaining() <= 0) {
+        return;
+      }
+      switch (effect.getName()) {
+        case "Healer's Herb":
+          results.extraHeal = 3;
+          break;
+      }
+    });
+    return results;
+  }
 
   applyPreAttackEffects(attacker: Player, defender: Player | null) {
-    let attackModifiers: ActionModifiers = {
+    let attackModifiers: PreAttackModifiers = {
       allowExtraAttack: false,
       extraAttackDamageModifier: null, // Default to no modification unless specified by an effect
       defenseModifierMultiple: null, // Additional defense modifier, could be positive or negative
