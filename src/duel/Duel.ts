@@ -89,6 +89,15 @@ export class Duel {
     );
   }
 
+  public getPlayersInitiative() {
+    return Array.from(this.participants.entries()).map(
+      ([playerId, { rolledInitative }]) => ({
+        playerId,
+        rolledInitative,
+      })
+    );
+  }
+
   public setPlayerInititative(playerId: string, initiative: number) {
     const playerInfo = this.participants.get(playerId);
     if (!playerInfo) {

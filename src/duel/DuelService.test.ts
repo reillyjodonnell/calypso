@@ -45,6 +45,62 @@ function createMockPlayer(id: string) {
   return new Player(id);
 }
 
+describe('when rolling for initative', () => {
+  it('should return the player with the highest roll', () => {
+    mock.module('../dice/dice', () => {
+      return {
+        parseDieAndRoll: mock(parseDieAndRoll).mockReturnValue(4),
+      };
+    });
+    const duel = new Duel('1');
+    const player1 = new Player('1');
+    const player2 = new Player('2');
+    duel.addPlayer(player1.getId(), 'CHALLENGER');
+    duel.addPlayer(player2.getId(), 'CHALLENGED');
+
+    duel.setPlayerInititative(player1.getId(), 10);
+    // duel.setPlayerInititative(player2.getId(), 5);
+
+    const duelService = new DuelService();
+    // I've hardcodded that a 4 is rolled
+    const { status, playerToGoFirst, result } = duelService.rollForInitiative({
+      duel,
+      playerId: player2.getId(),
+      sidedDie: '1d20',
+    });
+
+    expect(playerToGoFirst).toBe(player1.getId());
+    expect(status).toBe('ALL_PLAYERS_ROLLED');
+  });
+  it("should prompt users to roll again if they've rolled the same number", () => {
+    mock.module('../dice/dice', () => {
+      return {
+        parseDieAndRoll: mock(parseDieAndRoll).mockReturnValue(4),
+      };
+    });
+    const duel = new Duel('1');
+    const player1 = new Player('1');
+    const player2 = new Player('2');
+    duel.addPlayer(player1.getId(), 'CHALLENGER');
+    duel.addPlayer(player2.getId(), 'CHALLENGED');
+
+    duel.setPlayerInititative(player1.getId(), 4);
+
+    const duelService = new DuelService();
+    const { status, playerToGoFirst, result } = duelService.rollForInitiative({
+      duel,
+      playerId: player2.getId(),
+      sidedDie: '1d20',
+    });
+
+    expect(playerToGoFirst).not.toBeDefined();
+    expect(status).toBe('ROLL_AGAIN');
+
+    // each players roll should be allowed to roll again
+    expect(duel.hasAnyPlayerRolledForInitiative()).toBe(false);
+  });
+});
+
 describe('determine winner', () => {
   it('should return the other players id when 1 of the 2 dies', () => {
     mock.module('../dice/dice', () => {

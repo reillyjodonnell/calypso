@@ -26,6 +26,7 @@ import {
   PLAYER_NOT_CHALLENGED,
   PLAYER_NOT_FOUND,
   PLAYER_ROLLED,
+  ROLL_AGAIN,
 } from './DuelService';
 import { DiscordService } from '../discord/DiscordService';
 import {
@@ -361,6 +362,13 @@ export class DuelInteractionHandler {
     if (status === PLAYER_ROLLED) {
       await interaction.reply(
         `${interaction.user.displayName} rolled a ${result} for initiative!\nWaiting for other players to roll for initiative.`
+      );
+      return;
+    }
+
+    if (status === ROLL_AGAIN) {
+      await interaction.reply(
+        `${interaction.user.displayName} rolled a ${result} for initiative!\nBoth players rolled the same number. Roll again!`
       );
       return;
     }

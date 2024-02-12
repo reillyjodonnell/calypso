@@ -16,6 +16,7 @@ export const PLAYER_NOT_CHALLENGED = 'PLAYER_NOT_CHALLENGED';
 export const ALL_PLAYERS_READY = 'ALL_PLAYERS_READY';
 export const ALL_PLAYERS_ROLLED = 'ALL_PLAYERS_ROLLED';
 export const PLAYER_ALREADY_ROLLED = 'PLAYER_ALREADY_ROLLED';
+export const ROLL_AGAIN = 'ROLL_AGAIN';
 export const PLAYER_ROLLED = 'PLAYER_ROLLED';
 export const ATTACK_HITS = 'ATTACK_HITS';
 export const CRITICAL_HIT = 'CRITICAL_HIT';
@@ -155,7 +156,8 @@ export class DuelService {
       | typeof DUEL_NOT_FOUND
       | typeof ALL_PLAYERS_ROLLED
       | typeof PLAYER_ROLLED
-      | typeof PLAYER_ALREADY_ROLLED;
+      | typeof PLAYER_ALREADY_ROLLED
+      | typeof ROLL_AGAIN;
     result?: number;
     playerToGoFirst?: string;
   } {
@@ -173,6 +175,25 @@ export class DuelService {
     const result = duel.rollForInitative(playerId, sidedDie);
     duel.setIsBettingOpen(false);
     const allPlayersHaveRolled = duel.haveAllPlayersRolledForInitiative();
+
+    // if they have both rolled the same number, roll again
+    const getPlayersInitatives = duel.getPlayersInitiative();
+
+    const allPlayersRolledSameNumber = getPlayersInitatives.every(
+      (player) => player.rolledInitative === result
+    );
+
+    if (allPlayersRolledSameNumber) {
+      // reset their rolled initiative and have them roll again
+      duel.getParticipants().forEach((player) => {
+        duel.setPlayerInititative(player.playerId, 0);
+      });
+
+      return {
+        status: ROLL_AGAIN,
+        result,
+      };
+    }
 
     if (allPlayersHaveRolled) {
       duel.generateTurnOrder();
