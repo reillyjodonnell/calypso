@@ -82,6 +82,14 @@ export class ItemInteractionHandler {
       return;
     }
 
+    if (!duel?.getPlayersIds().includes(interaction.user.id)) {
+      await interaction.reply({
+        content: "This isn't your duel!",
+        ephemeral: true,
+      });
+      return;
+    }
+
     // make sure they haven't used in an item in a duel yet
     const { status: canUseItemStatus } = await this.duelService.canUseItem({
       duel,
@@ -116,6 +124,10 @@ export class ItemInteractionHandler {
 
     const player = await this.playerRepository.getById(duel.getId(), playerId);
 
+    if (!player) {
+      throw new Error('Player not found');
+    }
+
     const itemRepository = new ItemRepository();
 
     const item = await itemRepository.getItemById(itemId);
@@ -125,21 +137,36 @@ export class ItemInteractionHandler {
     }
 
     // use the item
-    const { status, playerDead, ...res } = await this.duelService.useItem({
-      duel,
-      player,
-      item,
-    });
+    const { status, playerDead, playerGoesAgain, ...res } =
+      await this.duelService.useItem({
+        duel,
+        player,
+        item,
+      });
     const { damage, heal } = res;
-
-    if (!player) {
-      throw new Error('Player not found');
-    }
 
     await this.inventoryRepository.useItem(playerId, itemId);
 
     await this.playerRepository.save(player, duel.getId());
     await this.duelRepository.save(duel);
+
+    if (playerGoesAgain) {
+      const message = `<@${player.getId()}> used ${item?.getName()}! They get to go again!`;
+      const row = getAllButtonOptions({
+        guildId: interaction.guildId,
+        channelId: interaction.channelId,
+        userId: interaction.user.id,
+        attackId: this.duelService.getCounter(),
+        healId: this.duelService.getCounter(),
+        leaveId: this.duelService.getCounter(),
+      });
+      await interaction.reply({
+        content: message,
+        components: [row as any],
+      });
+
+      return;
+    }
 
     if (playerDead) {
       // this shit needs to be abstracted it's too much

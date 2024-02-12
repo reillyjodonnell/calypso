@@ -22,9 +22,10 @@ export class ItemEffect {
   constructor(name: ItemEffectName) {
     this.name = name;
     if (name === "Healer's Herb") {
+      console.log('setting turns to 4');
       this.turnsRemaining = 4;
     } else {
-      this.turnsRemaining = 0;
+      this.turnsRemaining = 1;
     }
   }
 

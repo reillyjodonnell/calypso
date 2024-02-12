@@ -41,7 +41,6 @@ export function createInventoryEmbed(
     );
 
   if (items.length > 0) {
-    console.log(items);
     inventoryEmbed.addFields(
       ...items.map((item) => ({
         name: `${item.emoji} ${item.name} x${item.quantity}`,

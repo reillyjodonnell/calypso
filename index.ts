@@ -506,7 +506,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.customId.startsWith('item')) {
-      itemInteractionHandler.handleItemUse(interaction);
+      itemInteractionHandler.handleItem(interaction);
     }
 
     // inventory

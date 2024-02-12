@@ -1,8 +1,7 @@
 import { getRollsWithModifiers, parseDieAndRoll } from '../dice/dice';
 import { Item } from '../item/Item';
-import { ItemEffectService } from '../item/ItemEffectService';
+import { ActionModifiers, ItemEffectService } from '../item/ItemEffectService';
 import { ItemEffect, isValidItemEffectName } from '../item/ItemEffects';
-import { ItemRepository } from '../item/ItemRepository';
 import { Weapon } from '../item/weapon';
 import { Player } from '../player/player';
 import { RandomEventsGenerator } from '../randomEvents/RandomEventsGenerator';
@@ -226,15 +225,21 @@ export class DuelService {
       };
     }
 
-    console.log(sidedDie, 'sidedDie');
-    const roll = parseDieAndRoll(sidedDie);
-
     const currentTurnPlayerId = duel.getCurrentTurnPlayerId();
     if (attacker.getId() !== currentTurnPlayerId) {
       return { status: NOT_ATTACKERS_TURN };
     }
+    const itemEffectService = new ItemEffectService();
 
-    const doesHitTarget = roll >= defender.getAC();
+    const modifiers = itemEffectService.applyPreAttackEffects(
+      attacker,
+      defender
+    );
+
+    // round up to nearest whole number
+    const roll =
+      parseDieAndRoll(sidedDie) / (modifiers.defenseModifierMultiple ?? 1);
+    const doesHitTarget = Math.ceil(roll) >= defender.getAC();
 
     if (doesHitTarget) {
       attacker.setTargetId(defender.getId());
@@ -257,8 +262,11 @@ export class DuelService {
         defender,
       };
     }
-    attacker.setTargetId('');
-    duel.nextTurn();
+    this.endTurn({
+      duel,
+      player: attacker,
+      playerGoesAgain: modifiers.allowExtraAttack,
+    });
 
     if (attacker.getCriticalFail().includes(roll)) {
       return {
@@ -310,7 +318,6 @@ export class DuelService {
         status: PLAYER_NOT_FOUND,
       };
     }
-    console.log(attacker.getTargetId(), 'attacker.getTargetId()');
     return {
       status: 'TARGET_FOUND',
       targetId: attacker.getTargetId(),
@@ -340,7 +347,10 @@ export class DuelService {
     rolls?: number[];
     damage?: number;
     nextPlayerId?: string;
-    modifier?: number;
+    modifiers?: ActionModifiers;
+    rollModifier?: number;
+    attackerHealthRemaining?: number;
+    attackerDead?: boolean;
   } {
     if (!duel) {
       return {
@@ -364,10 +374,20 @@ export class DuelService {
       throw new Error('sidedDie is null');
     }
 
-    const { rolls, total, modifier } = getRollsWithModifiers(
+    const { rolls, modifier, ...rest } = getRollsWithModifiers(
       sidedDie,
       criticalHit
     );
+
+    let total = rest.total;
+
+    const itemEffectService = new ItemEffectService();
+    const modifiers = itemEffectService.applyPreAttackEffects(
+      attacker,
+      defender
+    );
+
+    total *= modifiers.extraAttackDamageModifier ?? 1;
 
     let sepuku = false;
     // if the attacker and defender are the same player, the attacker hurts themselves
@@ -379,36 +399,34 @@ export class DuelService {
       defender.hurt(total);
     }
 
+    if (modifiers.reflectedDamage && !sepuku) {
+      attacker.hurt(total * modifiers.reflectedDamage);
+    }
+
     const isTargetDead = sepuku
       ? attacker.isPlayerDead()
       : defender.isPlayerDead();
     const targetHealthRemaining = sepuku
       ? attacker.getHealth()
       : defender.getHealth();
-    attacker.clearTarget();
-
-    // move to next turn
-    duel.nextTurn();
+    this.endTurn({
+      duel,
+      player: attacker,
+      playerGoesAgain: modifiers.allowExtraAttack,
+    });
     const nextPlayerId = duel.getCurrentTurnPlayerId();
 
-    if (isTargetDead) {
-      return {
-        status: 'TARGET_DEAD',
-        targetHealthRemaining,
-        rolls,
-        damage: total,
-        nextPlayerId,
-        modifier,
-      };
-    }
-
     return {
-      status: 'TARGET_HIT',
+      status: isTargetDead ? 'TARGET_DEAD' : 'TARGET_HIT',
       targetHealthRemaining,
+      attackerHealthRemaining: attacker.getHealth(),
+      attackerDead: attacker.isPlayerDead(),
       rolls,
       damage: total,
       nextPlayerId,
-      modifier,
+      rollModifier: modifier,
+      modifiers,
+      // Include attackerDamage if you want to inform about the damage taken by the attacker due to reflection
     };
   }
 
@@ -461,7 +479,7 @@ export class DuelService {
         roll,
       };
     }
-    duel.nextTurn();
+    this.endTurn({ duel, player });
     const nextPlayerId = duel.getCurrentTurnPlayerId();
 
     return {
@@ -480,23 +498,18 @@ export class DuelService {
     item,
   }: {
     duel: Duel | null;
-    player: Player | null;
+    player: Player;
     item: Item;
   }): Promise<{
     status: typeof DUEL_NOT_FOUND | 'ITEM_USED' | 'PLAYER_NOT_FOUND';
     damage?: number;
     heal?: number;
     playerDead?: boolean;
+    playerGoesAgain?: boolean;
   }> {
     if (!duel) {
       return {
         status: DUEL_NOT_FOUND,
-      };
-    }
-
-    if (!player) {
-      return {
-        status: 'PLAYER_NOT_FOUND',
       };
     }
 
@@ -513,6 +526,13 @@ export class DuelService {
     const res = itemEffectService.applyEffect(player, itemEffect);
 
     duel.setPlayerUsedItem(player.getId());
+
+    if (res?.status === 'suddenStrike') {
+      return {
+        status: 'ITEM_USED',
+        playerGoesAgain: true,
+      };
+    }
 
     duel.nextTurn();
 
@@ -541,16 +561,40 @@ export class DuelService {
     };
   }
 
+  endTurn({
+    duel,
+    player,
+    playerGoesAgain = false,
+  }: {
+    duel: Duel | null;
+    player: Player;
+    playerGoesAgain?: boolean;
+  }) {
+    if (!duel) {
+      return {
+        status: DUEL_NOT_FOUND,
+      };
+    }
+    player.setTargetId('');
+    // increment all effects
+    const itemEffectService = new ItemEffectService();
+    itemEffectService.decrementEffectTurns(player);
+    itemEffectService.removeExpiredEffects(player);
+
+    if (playerGoesAgain) {
+      return;
+    }
+    duel.nextTurn();
+  }
+
   determineWinner(players: Player[]): { winnerId: string | null } {
     // Filter out players who are still alive
     const alivePlayers = players.filter((player) => {
-      console.log(`player ${player.getId()} health ${player.getHealth}`);
       return !player.isPlayerDead();
     });
 
     // Check if exactly one player is still alive
     if (alivePlayers.length === 1) {
-      console.log('winnerId', alivePlayers[0].getId());
       return { winnerId: alivePlayers[0].getId() };
     }
 
