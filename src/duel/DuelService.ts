@@ -1,3 +1,4 @@
+import { AIDuelService } from '../ai/AIDuelService';
 import { getRollsWithModifiers, parseDieAndRoll } from '../dice/dice';
 import { Item } from '../item/Item';
 import {
@@ -638,6 +639,10 @@ export class DuelService {
       return;
     }
     duel.nextTurn();
+    if (duel.isAIPlayer(duel.getCurrentTurnPlayerId())) {
+      // emit the event to process the AI turn
+      // this.aiDuelService.processAITurn(duel.getId(), duel.getCurrentTurnPlayerId());
+    }
   }
 
   determineWinner(players: Player[]): { winnerId: string | null } {

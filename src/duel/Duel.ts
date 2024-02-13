@@ -15,6 +15,7 @@ export class Duel {
       isReady: boolean;
       rolledInitative: number;
       hasUsedItem: boolean;
+      isAI?: boolean;
     }
   > = new Map();
   private turnNumber = 0;
@@ -27,6 +28,19 @@ export class Duel {
   private isBettingOpen = true;
 
   constructor(private readonly id: string) {}
+
+  public isAIPlayer(playerId: string) {
+    return this.participants.get(playerId)?.isAI;
+  }
+
+  public setAIPlayer(playerId: string) {
+    const playerInfo = this.participants.get(playerId);
+    if (!playerInfo) {
+      throw new Error('Player not found');
+    }
+    playerInfo.isAI = true;
+    this.participants.set(playerId, playerInfo);
+  }
 
   public getParticipants() {
     return this.participants;
