@@ -1,6 +1,11 @@
 # Use the oven/bun image as the base
 FROM oven/bun
 
+# Get python 3
+RUN apt-get update && apt-get install -y python3 python3-pip
+
+
+
 # Set the environment variable to make ffmpeg recognized as a system command
 ENV PATH="/usr/bin:${PATH}"
 
