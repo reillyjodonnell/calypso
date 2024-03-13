@@ -1,10 +1,6 @@
 # Use the oven/bun image as the base
 FROM oven/bun
 
-# Update the package list and install ffmpeg
-RUN apt-get update && \
-    apt-get install -y ffmpeg
-
 # Set the environment variable to make ffmpeg recognized as a system command
 ENV PATH="/usr/bin:${PATH}"
 
