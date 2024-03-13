@@ -10,5 +10,8 @@ COPY . /app
 # Set the working directory
 WORKDIR /app
 
+# Install the dependencies
+RUN bun install
+
 # The command to run your application
 CMD ["bun", "run", "index.ts"]
